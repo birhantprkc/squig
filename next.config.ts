@@ -7,6 +7,28 @@ import { fileURLToPath } from "node:url";
 const webxdc = process.env.WEBXDC === "1";
 
 const nextConfig: NextConfig = {
+  env: { NEXT_PUBLIC_SQUIG_OFFLINE: webxdc ? "1" : "0" },
+  ...(webxdc ? { pageExtensions: ["tsx"] } : {}),
+  // resvg is a native Node addon: bundling it fails ("non-ecmascript placeable
+  // asset"), so it stays a plain require at runtime.
+  serverExternalPackages: ["@resvg/resvg-js"],
+  // resvg's rasteriser is a native .node binding loaded at runtime, and the
+  // vendored fonts are read from disk — neither is an import Next's tracer can
+  // follow. Include both in the two agent functions that render PNGs. Globs
+  // must point at pnpm's real store paths: node_modules/@resvg is a symlink,
+  // and Vercel rejects a function package that contains symlinked directories.
+  outputFileTracingIncludes: {
+    "/mcp": [
+      "./lib/agent/fonts/*",
+      "./node_modules/.pnpm/@img+sharp-libvips-*/node_modules/@img/**/lib/*.so*",
+      "./node_modules/.pnpm/@resvg+resvg-js-*/node_modules/@resvg/**/*.node",
+    ],
+    "/api/v1/**": [
+      "./lib/agent/fonts/*",
+      "./node_modules/.pnpm/@img+sharp-libvips-*/node_modules/@img/**/lib/*.so*",
+      "./node_modules/.pnpm/@resvg+resvg-js-*/node_modules/@resvg/**/*.node",
+    ],
+  },
   // Pin the workspace root to this repo.
   //
   // Turbopack works out the root by walking up the tree looking for lockfiles,

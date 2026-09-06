@@ -45,7 +45,7 @@ in, so a retina screenshot doesn't eat the drawer.
 the file menu keeps a list of the recent ones to open again. New file starts a
 new document rather than painting over the last one. The drawer holds the last
 forty; past that, and when the browser runs out of room, the oldest ones go.
-No accounts, no cloud — which also means clearing site data clears the lot, so
+Local files need no accounts or cloud — clearing site data clears them, so
 Export a copy (`⇧⌘S`) is there when a file matters.
 
 ## Keyboard
@@ -82,8 +82,9 @@ pnpm install
 pnpm dev
 ```
 
-No environment variables, no database, no accounts — documents live in the
-browser's own storage. `pnpm test` type-checks and runs the geometry,
+The local canvas needs no environment variables, database, or accounts — those
+documents live in browser storage. The optional agent workspace server uses
+Postgres; see Squig for agents below. `pnpm test` type-checks and runs the geometry,
 selection and clipboard suites; `pnpm lint` and `pnpm build` are the other two
 worth running before you push.
 
@@ -132,3 +133,57 @@ an issue first.
 ## License
 
 [MIT](LICENSE) © Pablo Stanley
+
+## Squig for agents
+
+![Three editable wireframes on the shared Squig canvas](docs/agent-canvas.png)
+
+External agents draw on the same Squig canvas as the user. Open a canvas,
+click **Connect agent**, then **Copy for your agent**, and paste the
+invitation into your agent's chat. It carries the canvas link, a key scoped to
+that canvas, and the MCP and REST addresses, so an agent that can call HTTP
+starts over REST with nothing to install; MCP clients can use the same server.
+Watch it add real editable wireframes and notes, and edit alongside it.
+An agent with a workspace key can also create a new canvas and send its
+editable link before drawing. Keep variations side by side on that canvas.
+
+- **[Open a canvas](https://squig.sh)** — copy the invitation for your agent.
+- **[Workspace keys](https://squig.sh/connect)** — let an agent create canvases.
+- **[MCP setup](https://squig.sh/docs/mcp)** — Codex, Claude Code, Cursor, and
+  other Streamable HTTP clients. Endpoint: `https://squig.sh/mcp`.
+- **[API documentation](https://squig.sh/docs/api)** and
+  **[OpenAPI](https://squig.sh/openapi.json)** — the same commands over REST.
+- **[Agent-readable docs](https://squig.sh/llms-full.txt)** — the complete
+  workflow, document model, constraints, and setup.
+- **[Plugin](plugins/squig)** — an installable Codex plugin and wireframing skill.
+
+Agent workspaces are saved in Postgres. Ordinary local drawings still work
+without a key or database. Sharing a local canvas creates an online copy.
+Workspace keys grant access to the workspace. Canvas keys and editable links
+grant access to one canvas. Treat keys and invitation links as secrets.
+
+For a self-hosted agent server, set `DATABASE_URL` to your Neon database and
+`SQUIG_PUBLIC_URL` to your instance origin, then run:
+
+```bash
+pnpm install --frozen-lockfile
+node --env-file=.env.local scripts/agent/migrate.mjs
+pnpm dev
+```
+
+The migration is additive and idempotent. Test the command engine with
+`pnpm test:agent`; test MCP and REST against a running server and the real
+database with `node --env-file=.env.local scripts/agent/smoke.mjs`.
+The smoke test creates isolated fixtures and deletes them afterward. Set
+`SQUIG_TEST_URL` to change its default `http://localhost:3001` target.
+
+Install the plugin from this repository:
+
+```bash
+codex plugin marketplace add .
+codex plugin add squig@squig-plugins
+```
+
+Set `SQUIG_API_KEY` privately in your agent's environment and start a new task.
+No production code is generated or deployed by Squig's tools. Your coding
+agent handles implementation after the human chooses a direction.

@@ -14,7 +14,7 @@ import { INK, type Prim } from "@/lib/sketch/kit"
 import { imagePlacement, mirrorBox, mirrorGlyphs, primsToPaths } from "@/lib/sketch/paths"
 import { useIconCatalogVersion } from "@/lib/sketch/use-icon-catalog"
 import { nodePrims } from "@/lib/sketch/node-prims"
-import { cropOf, type ImageNode, type SquigNode } from "@/lib/types"
+import type { ImageNode, SquigNode } from "@/lib/types"
 
 export const SketchPrims = memo(function SketchPrims({
   prims,

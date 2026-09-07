@@ -447,7 +447,7 @@ export function addNodes(doc: SquigDocument, nodes: readonly SquigNode[]): Squig
 }
 
 /** The keys whose change means a text layer's box has to be measured again. */
-const TEXT_LAYOUT_KEYS: ReadonlySet<string> = new Set(["text", "fontSize", "bold", "italic", "boxed", "w", "fixedW", "fixedH"])
+const TEXT_LAYOUT_KEYS: ReadonlySet<string> = new Set(["text", "fontSize", "bold", "italic", "boxed", "w", "h", "fixedW", "fixedH"])
 
 /**
  * One node with a patch on it, vouched. A text layer keeps its box honest
@@ -463,7 +463,15 @@ export function patchNode(node: SquigNode, patch: Partial<SquigNode>, measureTex
   let merged: SquigNode
   if (node.type === "text") {
     const { text, fontSize, ...rest } = patch as Partial<TextNode>
-    const base: TextNode = { ...node, ...rest, ...(rest.w !== undefined ? { fixedW: true } : {}) }
+    // a width or height handed in is a chosen one, the way a dragged handle
+    // is: the words wrap to the width, and the height is a floor they may
+    // still push past — see setTextWidth and setTextHeight in text-reflow
+    const base: TextNode = {
+      ...node,
+      ...rest,
+      ...(rest.w !== undefined ? { fixedW: true } : {}),
+      ...(rest.h !== undefined ? { fixedH: true } : {}),
+    }
     const relaid = Object.keys(patch).some((k) => TEXT_LAYOUT_KEYS.has(k))
     merged = relaid
       ? { ...base, ...fitTextBox(base, text ?? node.text, fontSize ?? node.fontSize, measureText) }
@@ -518,6 +526,17 @@ export function groupNodes(
   ids: readonly string[],
   groupId: string = newId()
 ): { doc: SquigDocument; groupId: string } | null {
+  const stamped = stampGroup(doc, ids, groupId)
+  return stamped && { doc: { ...stamped, nodes: pruneDegenerateGroups(stamped.nodes) }, groupId }
+}
+
+/**
+ * The stamping half of groupNodes, with the document's other groups left
+ * exactly as they are. A caller applying a batch of its own uses this and
+ * prunes once at the end, so grouping two things can't dissolve a group it
+ * is still in the middle of rebuilding.
+ */
+export function stampGroup(doc: SquigDocument, ids: readonly string[], groupId: string): SquigDocument | null {
   // a locked layer is never in a selection, so ⌘G never sees one; here the
   // ids come straight from a caller, and the plan below would leave it out
   // while the stamping would still reach it
@@ -529,7 +548,7 @@ export function groupNodes(
   const top = doc.order.lastIndexOf(members[members.length - 1])
   const before = doc.order.slice(0, top + 1).filter((id) => !members.includes(id))
   const after = doc.order.slice(top + 1).filter((id) => !members.includes(id))
-  return { doc: { ...doc, nodes: pruneDegenerateGroups(map), order: [...before, ...members, ...after] }, groupId }
+  return { ...doc, nodes: map, order: [...before, ...members, ...after] }
 }
 
 export function bringToFront(doc: SquigDocument, ids: readonly string[]): SquigDocument {

@@ -4,14 +4,15 @@ import {
   DocError,
   bringToFront,
   emptyDoc,
-  groupNodes,
   patchNode,
   sendToBack,
+  stampGroup,
   textNode,
   vouchNode,
 } from "@/lib/doc"
 import { pruneDegenerateGroups } from "@/lib/canvas/groups"
 import type { TextMeasurer } from "@/lib/canvas/text-metrics"
+import type { FontMode } from "@/lib/theme"
 import { textMeasurer } from "./text-metrics"
 import { getDef } from "@/lib/library/registry"
 import { breakApart } from "@/lib/library/break-apart"
@@ -130,8 +131,16 @@ export function applyOperations(
   // add name a box the next add brings, the way it always could.
   let d = structuredClone(original)
   // the real faces, so a note wraps here exactly where the render breaks it;
-  // read off the document as it stands, since a look op may have changed it
-  const measure: TextMeasurer = (text, style) => textMeasurer(d.look.font)(text, style)
+  // chosen by the document as it stands, since a look op may have changed
+  // it, and kept per face because a measurer carries a width cache worth
+  // keeping across the thousand probes a long note costs
+  const measurers = new Map<FontMode, TextMeasurer>()
+  const measure: TextMeasurer = (text, style) => {
+    const font = d.look.font
+    let m = measurers.get(font)
+    if (!m) measurers.set(font, (m = textMeasurer(font)))
+    return m(text, style)
+  }
   const createdIds: string[] = []
   const members = (ids: string[], allowLocked = false) =>
     [...new Set(ids)].map((id) => {
@@ -258,13 +267,15 @@ export function applyOperations(
       }
       case "group": {
         members(op.ids, true)
-        const grouped = withDoc(() => groupNodes(d, op.ids, op.groupId))
+        // stamp only: pruning waits for validateDocument, or grouping two
+        // things here could dissolve a group the batch is still rebuilding
+        const grouped = stampGroup(d, op.ids, op.groupId ?? nanoid(12))
         if (!grouped)
           throw new AgentError(
             400,
             "Nothing to group: needs two or more unlocked nodes that are not already one group",
           )
-        d = grouped.doc as CanvasDocument
+        d = grouped as CanvasDocument
         break
       }
       case "ungroup":

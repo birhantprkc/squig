@@ -33,6 +33,7 @@ import {
   shapeNode,
   textNode,
   updateNode,
+  patchNode,
   groupNodes,
   DocError,
   type SquigDocument,
@@ -438,6 +439,11 @@ const button = (id: string, x = 0, y = 0) => componentNode("button", { id, seed:
   check("locking a label leaves its box alone", locked.nodes.t.w === 160 && locked.nodes.t.h === 80)
   const reworded = updateNode(doc, "t", { text: "Hello there" } as Partial<SquigNode>)
   check("…while new words re-fit it", reworded.nodes.t.w !== 160)
+  const wrapped = textNode("two lines of words here", { x: 0, y: 0, w: 80, fontSize: 18, seed: 1, id: "p" })
+  const squashed = patchNode(wrapped, { h: 1 } as Partial<SquigNode>) as TextNode
+  check("a height patch is a floor the words may push past", squashed.h >= wrapped.h && squashed.fixedH === true)
+  const roomy = patchNode(wrapped, { h: 300 } as Partial<SquigNode>) as TextNode
+  check("…and a roomy one is kept", roomy.h === 300)
   const long = "y".repeat(80)
   check("an eighty-character id is welcome", addNodes(emptyDoc("ids"), [shapeNode("rect", { x: 0, y: 0, w: 1, h: 1, id: long, seed: 1 })]).order[0] === long)
 }

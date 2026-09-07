@@ -833,6 +833,25 @@ check(
   ).document
   const detached = applyOperations(withButton, ops([{ op: "detach", ids: ["btn"] }])).document
   check("detaching a grouped component keeps its sibling in the group", same(detached.nodes.q.groupIds, ["pair"]))
+
+  const rebuilt = applyOperations(
+    withButton,
+    ops([
+      { op: "delete", ids: ["q"] },
+      { op: "add", nodes: [{ id: "c", type: "shape", x: 0, y: 500, w: 1, h: 1 }, { id: "d", type: "shape", x: 0, y: 600, w: 1, h: 1 }] },
+      { op: "group", ids: ["c", "d"] },
+      { op: "add", nodes: [{ id: "q", type: "shape", x: 200, y: 0, w: 40, h: 40, groupIds: ["pair"] }] },
+    ]),
+  ).document
+  check("grouping elsewhere doesn't dissolve a group the batch is rebuilding", same(rebuilt.nodes.btn.groupIds, ["pair"]) && same(rebuilt.nodes.q.groupIds, ["pair"]))
+
+  const tall = applyOperations(
+    two,
+    ops([{ op: "add", nodes: [{ id: "para", type: "text", x: 0, y: 0, w: 80, fixedW: true, text: "two lines of words here", fontSize: 18 }] }]),
+  ).document
+  const squashed = applyOperations(tall, ops([{ op: "update", patches: [{ id: "para", patch: { h: 1 } }] }])).document
+  const needed = textNode("two lines of words here", { x: 0, y: 0, w: 80, fontSize: 18 }, textMeasurer("hand")).h
+  check("a height patch can't push the words out of the box", squashed.nodes.para.h === needed && needed > 1)
 }
 
 report(`agent engine checks passed (${ALL_DEFS.length} library definitions)`)

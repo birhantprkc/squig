@@ -2,7 +2,8 @@
 
 // ---------------------------------------------------------------------------
 // What a selection looks like — the ring, its eight handles, an arrow's two
-// ends, and the anchor zones a connector is aiming at.
+// ends, the anchor zones a connector is aiming at, and the guides a drag lines
+// itself up against.
 //
 // All of it is screen-space chrome laid over the canvas: nothing here reads or
 // writes the document, it only draws what Canvas has hold of and hands presses
@@ -12,6 +13,7 @@
 
 import { anchorPoint, arrowEnds, bindOf } from "@/lib/canvas/arrow-binding"
 import { nodeVisualBounds, worldRouteHandle, type RouteHandle } from "@/lib/canvas/line-routing"
+import type { DistanceIndicator, GuideLine } from "@/lib/canvas/snap-engine"
 import { HANDLES, HANDLE_CURSORS, handleOffset, type Handle } from "@/lib/canvas/transform"
 import { unionBounds } from "@/lib/selection"
 import { ARROW_ANCHORS, type ArrowAnchor, type ArrowNode, type SquigNode } from "@/lib/types"
@@ -412,5 +414,89 @@ export function SelectionOverlay({
         </div>
       )}
     </>
+  )
+}
+
+/**
+ * Screen-space feedback for the snap engine.
+ *
+ * Alignment uses a light dashed hairline so it reads as a temporary
+ * relationship, not another selected object. Equal spacing gets the warmer
+ * measuring colour and a compact numeric chip; both disappear with the
+ * gesture rather than leaving measurement chrome behind on the canvas.
+ */
+export function SmartGuides({ guides, distances }: { guides: GuideLine[]; distances: DistanceIndicator[] }) {
+  const guidePad = 6
+  const tick = 3
+  return (
+    <svg aria-hidden="true" className="pointer-events-none absolute inset-0 h-full w-full overflow-visible">
+      {guides.map((g, i) =>
+        g.axis === "x" ? (
+          <line
+            key={`guide-x-${i}`}
+            x1={g.position}
+            y1={g.start - guidePad}
+            x2={g.position}
+            y2={g.end + guidePad}
+            stroke="var(--sq-select)"
+            strokeWidth={1}
+            strokeDasharray="3 3"
+          />
+        ) : (
+          <line
+            key={`guide-y-${i}`}
+            x1={g.start - guidePad}
+            y1={g.position}
+            x2={g.end + guidePad}
+            y2={g.position}
+            stroke="var(--sq-select)"
+            strokeWidth={1}
+            strokeDasharray="3 3"
+          />
+        )
+      )}
+      {distances.map((d, i) => {
+        const label = String(d.distance)
+        const labelW = Math.max(18, label.length * 6 + 8)
+        const labelH = 16
+        return (
+          <g key={`distance-${d.axis}-${i}`}>
+            <line x1={d.x1} y1={d.y1} x2={d.x2} y2={d.y2} stroke="var(--sq-measure)" strokeWidth={1} />
+            {d.axis === "x" ? (
+              <>
+                <line x1={d.x1} y1={d.y1 - tick} x2={d.x1} y2={d.y1 + tick} stroke="var(--sq-measure)" />
+                <line x1={d.x2} y1={d.y2 - tick} x2={d.x2} y2={d.y2 + tick} stroke="var(--sq-measure)" />
+              </>
+            ) : (
+              <>
+                <line x1={d.x1 - tick} y1={d.y1} x2={d.x1 + tick} y2={d.y1} stroke="var(--sq-measure)" />
+                <line x1={d.x2 - tick} y1={d.y2} x2={d.x2 + tick} y2={d.y2} stroke="var(--sq-measure)" />
+              </>
+            )}
+            <rect
+              x={d.labelX - labelW / 2}
+              y={d.labelY - labelH / 2}
+              width={labelW}
+              height={labelH}
+              rx={4}
+              fill="var(--sq-measure)"
+            />
+            <text
+              x={d.labelX}
+              y={d.labelY}
+              dy="0.34em"
+              fill="white"
+              fontFamily="var(--font-sans), ui-sans-serif, sans-serif"
+              fontSize={10}
+              fontWeight={650}
+              style={{ fontVariantNumeric: "tabular-nums" }}
+              textAnchor="middle"
+            >
+              {label}
+            </text>
+          </g>
+        )
+      })}
+    </svg>
   )
 }

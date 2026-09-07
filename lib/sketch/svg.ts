@@ -13,6 +13,7 @@
 import type { ExportSurface } from "@/lib/export-image-document"
 import { svgDocument } from "@/lib/export-image-document"
 import { nodeVisualBounds } from "@/lib/canvas/line-routing"
+import type { TextMeasurer } from "@/lib/canvas/text-metrics"
 import { iconPathsReady, loadIconWeight, normalizeIconWeight, type IconWeight } from "./icon-catalog"
 import { INK, resolveIconName } from "./kit"
 import { nodePrims } from "./node-prims"
@@ -51,8 +52,13 @@ export function makeResolver(p: Palette): (paint: string) => string {
  * react-dom/server because pulling a server renderer into the client bundle to
  * print thirty lines of markup is a poor trade.
  */
-export function nodeMarkup(node: SquigNode, resolve: (paint: string) => string, font: string): string {
-  const { paths, texts, crisp } = primsToPaths(nodePrims(node), node.seed)
+export function nodeMarkup(
+  node: SquigNode,
+  resolve: (paint: string) => string,
+  font: string,
+  measureText?: TextMeasurer
+): string {
+  const { paths, texts, crisp } = primsToPaths(nodePrims(node, measureText), node.seed)
   const out: string[] = []
 
   // A pasted picture is the one node that isn't made of marks, so it has to be
@@ -128,13 +134,22 @@ export async function loadIconsFor(list: readonly SquigNode[]): Promise<void> {
   await Promise.all([...weights].map((w) => loadIconWeight(w)))
 }
 
-/** The marks and the world box they cover, or null when there's nothing to draw. */
+/**
+ * The marks and the world box they cover, or null when there's nothing to draw.
+ *
+ * `measureText` is how a caller off the browser gets real line breaks: without
+ * one the text prims fall back to an em-ratio guess, which is close enough for
+ * a preview and wrong enough to wrap a fixed-width paragraph in the wrong
+ * places. `pad` is the breathing room around the art; the export wants a hair,
+ * the agent's PNG wants a margin.
+ */
 export function drawNodes(
   list: readonly SquigNode[],
   look: Look,
-  font: string = FONT_STACK[look.font]
+  opts: { font?: string; measureText?: TextMeasurer; pad?: number } = {}
 ): { body: string; x: number; y: number; w: number; h: number; paper: string } | null {
   if (!list.length) return null
+  const { font = FONT_STACK[look.font], measureText, pad = EXPORT_PAD } = opts
   const palette = paletteOf(look.theme)
   const resolve = makeResolver(palette)
   // routed connectors can bow or dogleg outside the endpoint box stored on
@@ -151,11 +166,11 @@ export function drawNodes(
     maxY = Math.max(maxY, b.y + b.h)
   }
   return {
-    body: list.map((n) => nodeMarkup(n, resolve, font)).join(""),
-    x: minX - EXPORT_PAD,
-    y: minY - EXPORT_PAD,
-    w: Math.max(maxX - minX + EXPORT_PAD * 2, 1),
-    h: Math.max(maxY - minY + EXPORT_PAD * 2, 1),
+    body: list.map((n) => nodeMarkup(n, resolve, font, measureText)).join(""),
+    x: minX - pad,
+    y: minY - pad,
+    w: Math.max(maxX - minX + pad * 2, 1),
+    h: Math.max(maxY - minY + pad * 2, 1),
     paper: bgOf(palette, look.paper),
   }
 }
@@ -166,8 +181,13 @@ export function drawNodes(
  * a blank picture, so a caller can tell the two apart. Synchronous: a caller
  * that hasn't already drawn these nodes on screen awaits loadIconsFor first.
  */
-export function renderSvg(list: readonly SquigNode[], look: Look, surface: ExportSurface = "paper"): string {
-  const d = drawNodes(list, look)
+export function renderSvg(
+  list: readonly SquigNode[],
+  look: Look,
+  surface: ExportSurface = "paper",
+  measureText?: TextMeasurer
+): string {
+  const d = drawNodes(list, look, { measureText })
   if (!d) return ""
   return `<?xml version="1.0" encoding="UTF-8"?>\n${svgDocument({ ...d, css: "" }, d.w, d.h, surface)}`
 }

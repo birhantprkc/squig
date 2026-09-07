@@ -50,8 +50,10 @@ not a mockup tool. Features that push toward pixel-precision — gradients,
 shadows, exact color pickers — are usually the wrong direction, because the
 whole point is that nothing looks decided yet.
 
-**It doesn't add a backend.** No accounts, no sync, no cloud. Files stay in
-the browser.
+**It keeps the canvas backend-free.** No accounts, no sync, no cloud, and your
+files stay in the browser. The optional agent workspace is the one server-side
+piece squig has, and it stays optional: the canvas itself works with no
+database at all.
 
 ## Style
 

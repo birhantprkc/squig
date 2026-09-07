@@ -17,7 +17,7 @@ import { basename, resolve } from "node:path"
 import { parseArgs } from "node:util"
 import {
   DocError, addNodes, arrowNode, bringToFront, componentNode, describeComponent, docBounds,
-  emptyDoc, groupNodes, listComponents, nodesOf, parseDoc, removeNodes, sendToBack,
+  emptyDoc, groupNodes, listComponents, nodeRow, nodesOf, parseDoc, removeNodes, sendToBack,
   serializeDoc, shapeNode, textNode, updateNode, type ArrowEnd, type SquigDocument,
 } from "@/lib/doc"
 import { renderSvg } from "@/lib/sketch/svg"
@@ -126,24 +126,6 @@ function table(rows: string[][]): string {
 }
 
 const r = (v: number) => String(Math.round(v))
-const clip = (s: string) => {
-  const flat = s.replace(/\s+/g, " ").trim()
-  return flat.length > 40 ? flat.slice(0, 39) + "…" : flat
-}
-
-/** id, what it is, its box, and what it's called — one node per line. */
-function nodeRow(n: SquigNode): string[] {
-  let label = ""
-  if (n.type === "text") label = clip(n.text)
-  else if (n.type === "component") {
-    const said = [n.props.label, n.props.title].find((v) => typeof v === "string" && v)
-    label = typeof said === "string" ? clip(said) : ""
-  } else if (n.type === "arrow") {
-    const end = (i: 0 | 1) => n.bind?.[i] ?? `${r(n.x + n.points[i][0])},${r(n.y + n.points[i][1])}`
-    label = `${end(0)} → ${end(1)}`
-  }
-  return [n.id, n.type === "component" ? n.kind : n.type, `${r(n.x)} ${r(n.y)} ${r(n.w)} ${r(n.h)}`, label]
-}
 
 function arrowEnd(raw: string, which: string): ArrowEnd {
   const point = raw.match(/^(-?[\d.]+)\s*,\s*(-?[\d.]+)$/)

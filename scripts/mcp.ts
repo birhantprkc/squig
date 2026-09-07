@@ -17,7 +17,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod"
 import {
   DocError, addNodes, arrowNode, bringToFront, componentNode, describeComponent, docBounds,
-  emptyDoc, groupNodes, listComponents, nodesOf, parseDoc, removeNodes, sendToBack,
+  emptyDoc, groupNodes, listComponents, nodeLine, nodesOf, parseDoc, removeNodes, sendToBack,
   serializeDoc, shapeNode, textNode, updateNode, type SquigDocument,
 } from "@/lib/doc"
 import { renderSvg } from "@/lib/sketch/svg"
@@ -80,29 +80,6 @@ function tool<S extends z.ZodRawShape>(
 }
 
 const r = (v: number) => String(Math.round(v))
-const clip = (s: string) => {
-  const flat = s.replace(/\s+/g, " ").trim()
-  return flat.length > 40 ? flat.slice(0, 39) + "…" : flat
-}
-
-/**
- * One node per line, the same shape the CLI's `ls` prints. Duplicated from
- * scripts/squig.ts rather than shared because both files are meant to be read
- * end to end, and ten lines of formatting is cheaper to repeat than a module
- * neither of them owns.
- */
-function nodeLine(n: SquigNode): string {
-  let label = ""
-  if (n.type === "text") label = clip(n.text)
-  else if (n.type === "component") {
-    const said = [n.props.label, n.props.title].find((v) => typeof v === "string" && v)
-    label = typeof said === "string" ? clip(said) : ""
-  } else if (n.type === "arrow") {
-    const end = (i: 0 | 1) => n.bind?.[i] ?? `${r(n.x + n.points[i][0])},${r(n.y + n.points[i][1])}`
-    label = `${end(0)} → ${end(1)}`
-  }
-  return `${n.id}  ${n.type === "component" ? n.kind : n.type}  ${r(n.x)} ${r(n.y)} ${r(n.w)} ${r(n.h)}${label ? `  ${label}` : ""}`
-}
 
 // -- the library -------------------------------------------------------------
 

@@ -434,6 +434,39 @@ export function sendToBack(doc: SquigDocument, ids: readonly string[]): SquigDoc
   return { ...doc, order: [...doc.order.filter((id) => picked.has(id)), ...doc.order.filter((id) => !picked.has(id))] }
 }
 
+// -- saying what's on the sheet ---------------------------------------------
+
+const whole = (v: number) => String(Math.round(v))
+
+function clip(s: string): string {
+  const flat = s.replace(/\s+/g, " ").trim()
+  return flat.length > 40 ? flat.slice(0, 39) + "…" : flat
+}
+
+/**
+ * One node as four columns: its id, what it is, its box, and what it says.
+ * The CLI's `ls`, the MCP server's read_document and anything else that has to
+ * name a node in a line of text print this, so an agent reading one door's
+ * answer can use the words at another.
+ */
+export function nodeRow(n: SquigNode): [id: string, what: string, box: string, label: string] {
+  let label = ""
+  if (n.type === "text") label = clip(n.text)
+  else if (n.type === "component") {
+    const said = [n.props.label, n.props.title].find((v) => typeof v === "string" && v)
+    label = typeof said === "string" ? clip(said) : ""
+  } else if (n.type === "arrow") {
+    const end = (i: 0 | 1) => n.bind?.[i] ?? `${whole(n.x + n.points[i][0])},${whole(n.y + n.points[i][1])}`
+    label = `${end(0)} → ${end(1)}`
+  }
+  return [n.id, n.type === "component" ? n.kind : n.type, `${whole(n.x)} ${whole(n.y)} ${whole(n.w)} ${whole(n.h)}`, label]
+}
+
+/** nodeRow on one line, two spaces between columns. */
+export function nodeLine(n: SquigNode): string {
+  return nodeRow(n).filter(Boolean).join("  ")
+}
+
 // -- the catalog, for a caller that can't read TypeScript --------------------
 
 export interface ComponentSummary {

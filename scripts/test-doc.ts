@@ -444,6 +444,10 @@ const button = (id: string, x = 0, y = 0) => componentNode("button", { id, seed:
   check("a height patch is a floor the words may push past", squashed.h >= wrapped.h && squashed.fixedH === true)
   const roomy = patchNode(wrapped, { h: 300 } as Partial<SquigNode>) as TextNode
   check("…and a roomy one is kept", roomy.h === 300)
+  const letGo = patchNode(roomy, { h: 300, fixedH: undefined } as Partial<SquigNode>) as TextNode
+  check("a size handed back with the flag let go is not a chosen size", letGo.fixedH === undefined && letGo.h === wrapped.h)
+  const loose = patchNode(wrapped, { w: 200, fixedW: false } as Partial<SquigNode>) as TextNode
+  check("…and the same for width", !loose.fixedW)
   const long = "y".repeat(80)
   check("an eighty-character id is welcome", addNodes(emptyDoc("ids"), [shapeNode("rect", { x: 0, y: 0, w: 1, h: 1, id: long, seed: 1 })]).order[0] === long)
 }

@@ -465,12 +465,14 @@ export function patchNode(node: SquigNode, patch: Partial<SquigNode>, measureTex
     const { text, fontSize, ...rest } = patch as Partial<TextNode>
     // a width or height handed in is a chosen one, the way a dragged handle
     // is: the words wrap to the width, and the height is a floor they may
-    // still push past — see setTextWidth and setTextHeight in text-reflow
+    // still push past — see setTextWidth and setTextHeight in text-reflow.
+    // Unless the patch says otherwise about the flag itself: a caller
+    // handing back a size together with fixedW: false is letting go.
     const base: TextNode = {
       ...node,
       ...rest,
-      ...(rest.w !== undefined ? { fixedW: true } : {}),
-      ...(rest.h !== undefined ? { fixedH: true } : {}),
+      ...(rest.w !== undefined && !("fixedW" in rest) ? { fixedW: true } : {}),
+      ...(rest.h !== undefined && !("fixedH" in rest) ? { fixedH: true } : {}),
     }
     const relaid = Object.keys(patch).some((k) => TEXT_LAYOUT_KEYS.has(k))
     merged = relaid

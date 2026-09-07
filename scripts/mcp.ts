@@ -20,7 +20,7 @@ import {
   emptyDoc, groupNodes, listComponents, nodeLine, nodesOf, parseDoc, removeNodes, sendToBack,
   serializeDoc, shapeNode, textNode, updateNode, type SquigDocument,
 } from "@/lib/doc"
-import { renderSvg } from "@/lib/sketch/svg"
+import { loadIconsFor, renderSvg } from "@/lib/sketch/svg"
 import type { SquigNode } from "@/lib/types"
 
 const INSTRUCTIONS = `squig draws wireframes that look hand-sketched. A document is one .squig.json file: a flat map of nodes on an infinite sheet, addressed by absolute path, which a person opens in the app with File > Open or by dropping the file on the canvas.
@@ -64,13 +64,13 @@ function tool<S extends z.ZodRawShape>(
   name: string,
   description: string,
   inputSchema: S,
-  run: (args: z.infer<z.ZodObject<S>>) => string
+  run: (args: z.infer<z.ZodObject<S>>) => string | Promise<string>
 ): void {
   // the cast is the SDK's inference giving up on a shape it can't see through,
   // not a claim about the arguments: they are exactly `inputSchema` parsed
-  const cb = (args: z.infer<z.ZodObject<S>>) => {
+  const cb = async (args: z.infer<z.ZodObject<S>>) => {
     try {
-      return { content: [{ type: "text" as const, text: run(args) }] }
+      return { content: [{ type: "text" as const, text: await run(args) }] }
     } catch (err) {
       if (err instanceof DocError) return { content: [{ type: "text" as const, text: err.message }], isError: true }
       throw err
@@ -253,8 +253,9 @@ tool(
     out: z.string().optional().describe("where to write the SVG; defaults to next to the document"),
     transparent: z.boolean().optional().describe("no paper behind the drawing"),
   },
-  ({ path: p, out, transparent }) => {
+  async ({ path: p, out, transparent }) => {
     const { path: abs, doc } = readDoc(p)
+    await loadIconsFor(nodesOf(doc))
     const svg = renderSvg(nodesOf(doc), doc.look, transparent ? "transparent" : "paper")
     if (!svg) throw new DocError("nothing on the sheet to draw")
     if (svg.length <= INLINE_LIMIT && !out) return svg

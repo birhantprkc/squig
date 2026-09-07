@@ -25,11 +25,9 @@
 // raster has a ceiling — see rasterScale — and a vector doesn't.
 // ---------------------------------------------------------------------------
 
-import { drawNodes } from "./sketch/svg"
+import { drawNodes, loadIconsFor } from "./sketch/svg"
 import { copiedSurface, svgDocument, type ExportDrawing, type ExportSurface } from "./export-image-document"
 import { downloadBlob } from "./file-io"
-import { iconPathsReady, loadIconWeight, normalizeIconWeight } from "./sketch/icon-catalog"
-import { resolveIconName } from "./sketch/kit"
 import { useSquig } from "./store"
 import type { SquigNode } from "./types"
 
@@ -209,18 +207,7 @@ function pngTargets(): { nodes: SquigNode[]; whole: boolean } {
 async function draw(list: SquigNode[]): Promise<ExportDrawing> {
   if (!list.length) throw new Error("nothing to draw")
 
-  // icon paths stream in from lazy chunks; the on-screen canvas can redraw
-  // when they land, but this render is one-shot — so wait for every weight the
-  // picture needs before printing it. Only icon nodes can name arbitrary
-  // glyphs; every other def draws from the curated inline set.
-  const weights = new Set<ReturnType<typeof normalizeIconWeight>>()
-  for (const n of list) {
-    if (n.type !== "component" || n.kind !== "icon") continue
-    const w = normalizeIconWeight(n.props.weight)
-    const resolved = resolveIconName(String(n.props.name ?? ""))
-    if (resolved && !iconPathsReady(resolved, w)) weights.add(w)
-  }
-  await Promise.all([...weights].map((w) => loadIconWeight(w)))
+  await loadIconsFor(list)
 
   const s = useSquig.getState()
   const font = canvasFontStack()

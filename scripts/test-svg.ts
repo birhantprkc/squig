@@ -15,8 +15,8 @@
 // ---------------------------------------------------------------------------
 
 import { componentNode, shapeNode, textNode } from "../lib/doc.ts"
-import { EXPORT_PAD, renderSvg } from "../lib/sketch/svg.ts"
-import { bgOf, paletteOf, type Look } from "../lib/theme.ts"
+import { EXPORT_PAD, loadIconsFor, renderSvg } from "../lib/sketch/svg.ts"
+import { bgOf, DEFAULT_LOOK, paletteOf, type Look } from "../lib/theme.ts"
 import type { ImageNode, SquigNode } from "../lib/types.ts"
 import { check, report } from "./harness.ts"
 
@@ -111,6 +111,15 @@ const gs = (svg: string) => (svg.match(/<g transform="translate\(/g) ?? []).leng
   const list = [box, label, btn]
   check("rendering twice gives the same bytes", renderSvg(list, LOOK) === renderSvg(list, LOOK))
   check("…and so does a fresh copy of the same nodes", renderSvg(list.map((n) => ({ ...n })), LOOK) === renderSvg(list, LOOK))
+}
+
+// -- icons from a lazy catalog -----------------------------------------------
+
+{
+  const heavy = componentNode("icon", { x: 0, y: 0, id: "i", seed: 1, props: { name: "acorn", weight: "fill" } })
+  await loadIconsFor([heavy])
+  const svg = renderSvg([heavy], DEFAULT_LOOK)
+  check("an icon from a weight that had to be fetched still prints its glyph", /<g transform="translate\(\d[^"]*\) scale\([^"]*\)"><path/.test(svg))
 }
 
 report("svg checks passed")

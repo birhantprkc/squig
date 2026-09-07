@@ -20,7 +20,7 @@ import {
   emptyDoc, groupNodes, listComponents, nodeRow, nodesOf, parseDoc, removeNodes, sendToBack,
   serializeDoc, shapeNode, textNode, updateNode, type ArrowEnd, type SquigDocument,
 } from "@/lib/doc"
-import { renderSvg } from "@/lib/sketch/svg"
+import { loadIconsFor, renderSvg } from "@/lib/sketch/svg"
 import type { InkTone, LineStyle, ShapeKind, SquigNode, TextAlign } from "@/lib/types"
 
 const USAGE = `squig — draw wireframes from a terminal
@@ -186,7 +186,7 @@ function built(command: string, args: string[], doc: SquigDocument): SquigNode {
   )
 }
 
-function run(command: string | undefined, args: string[]): void {
+async function run(command: string | undefined, args: string[]): Promise<void> {
   switch (command) {
     case "components": {
       const found = listComponents(args[0] ?? "")
@@ -252,6 +252,7 @@ function run(command: string | undefined, args: string[]): void {
     }
     case "render": {
       const doc = readDoc(need(args[0], "a document"))
+      await loadIconsFor(nodesOf(doc))
       const svg = renderSvg(nodesOf(doc), doc.look, flag.transparent ? "transparent" : "paper")
       if (!svg) throw new DocError("nothing on the sheet to draw")
       if (!flag.out) {
@@ -278,7 +279,7 @@ function run(command: string | undefined, args: string[]): void {
 }
 
 try {
-  run(positionals[0], positionals.slice(1))
+  await run(positionals[0], positionals.slice(1))
 } catch (err) {
   if (err instanceof DocError) {
     console.error(err.message)

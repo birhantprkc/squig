@@ -408,11 +408,14 @@ export function removeNodes(doc: SquigDocument, ids: readonly string[]): SquigDo
 /**
  * Group nodes, the way ⌘G does: the members collapse together at the topmost
  * one's z-position so nothing can sit inside the group's range and look like
- * it belongs. Null when there is nothing to group — fewer than two things, or
- * one group that is already whole.
+ * it belongs. Locked layers are left out. Null when there is nothing to group
+ * — fewer than two things, or one group that is already whole.
  */
 export function groupNodes(doc: SquigDocument, ids: readonly string[]): { doc: SquigDocument; groupId: string } | null {
-  const members = doc.order.filter((id) => ids.includes(id) && doc.nodes[id])
+  // a locked layer is never in a selection, so ⌘G never sees one; here the
+  // ids come straight from a caller, and the plan below would leave it out
+  // while the stamping would still reach it
+  const members = doc.order.filter((id) => ids.includes(id) && doc.nodes[id] && !doc.nodes[id].locked)
   const groupId = newId()
   const paths = planGroupPaths(members, doc.nodes, doc.order, groupId)
   if (!paths) return null

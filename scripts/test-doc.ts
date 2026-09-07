@@ -353,4 +353,19 @@ const button = (id: string, x = 0, y = 0) => componentNode("button", { id, seed:
   check("an unknown kind describes as nothing", describeComponent("buttonn") === null)
 }
 
+// -- a locked layer stays out of a group -------------------------------------
+
+{
+  const doc = addNodes(emptyDoc("locks"), [
+    shapeNode("rect", { x: 0, y: 0, w: 10, h: 10, id: "bg", seed: 1, locked: true }),
+    shapeNode("rect", { x: 0, y: 0, w: 10, h: 10, id: "a", seed: 1 }),
+    shapeNode("rect", { x: 0, y: 0, w: 10, h: 10, id: "b", seed: 1 }),
+  ])
+  const g = groupNodes(doc, ["bg", "a", "b"])
+  check("the loose two still group", !!g && g.doc.nodes.a.groupIds?.[0] === g.groupId)
+  check("…and the locked one is left out of it", g?.doc.nodes.bg.groupIds === undefined)
+  check("…and left where it was in the order", g?.doc.order[0] === "bg")
+  check("a locked layer and one loose one is nothing to group", groupNodes(doc, ["bg", "a"]) === null)
+}
+
 report("document checks passed")

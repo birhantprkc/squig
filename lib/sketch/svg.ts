@@ -13,7 +13,8 @@
 import type { ExportSurface } from "@/lib/export-image-document"
 import { svgDocument } from "@/lib/export-image-document"
 import { nodeVisualBounds } from "@/lib/canvas/line-routing"
-import { INK } from "./kit"
+import { iconPathsReady, loadIconWeight, normalizeIconWeight, type IconWeight } from "./icon-catalog"
+import { INK, resolveIconName } from "./kit"
 import { nodePrims } from "./node-prims"
 import { imagePlacement, mirrorBox, mirrorGlyphs, primsToPaths } from "./paths"
 import { bgOf, FONT_STACK, paletteOf, type Look, type Palette } from "@/lib/theme"
@@ -108,6 +109,25 @@ export function nodeMarkup(node: SquigNode, resolve: (paint: string) => string, 
   return `<g transform="translate(${node.x} ${node.y})">${out.join("")}</g>`
 }
 
+/**
+ * Pull in every icon catalog these nodes draw from, before a one-shot render.
+ *
+ * Icon paths stream in from lazy chunks; the on-screen canvas redraws when
+ * they land, but an SVG is printed once. Only icon nodes can name arbitrary
+ * glyphs and weights — every other def draws from the curated inline set, so
+ * a drawing without an icon layer resolves without loading anything.
+ */
+export async function loadIconsFor(list: readonly SquigNode[]): Promise<void> {
+  const weights = new Set<IconWeight>()
+  for (const n of list) {
+    if (n.type !== "component" || n.kind !== "icon") continue
+    const w = normalizeIconWeight(n.props.weight)
+    const resolved = resolveIconName(String(n.props.name ?? ""))
+    if (resolved && !iconPathsReady(resolved, w)) weights.add(w)
+  }
+  await Promise.all([...weights].map((w) => loadIconWeight(w)))
+}
+
 /** The marks and the world box they cover, or null when there's nothing to draw. */
 export function drawNodes(
   list: readonly SquigNode[],
@@ -143,7 +163,8 @@ export function drawNodes(
 /**
  * A standalone SVG of these nodes at life size, on the look's paper unless
  * asked for a transparent sheet. Empty input gives an empty string rather than
- * a blank picture, so a caller can tell the two apart.
+ * a blank picture, so a caller can tell the two apart. Synchronous: a caller
+ * that hasn't already drawn these nodes on screen awaits loadIconsFor first.
  */
 export function renderSvg(list: readonly SquigNode[], look: Look, surface: ExportSurface = "paper"): string {
   const d = drawNodes(list, look)

@@ -66,7 +66,11 @@ export interface SquigAgentApi {
   bounds(): Box | null
   components(query?: string): ComponentSummary[]
   describe(kind: string): ComponentInfo | null
-  /** standalone SVG of these nodes (default: the whole drawing), no fonts inlined */
+  /**
+   * Standalone SVG of these nodes (default: the whole drawing), no fonts
+   * inlined. Synchronous, so it draws with the icon catalogs the canvas has
+   * already pulled in — which is every icon on screen.
+   */
   svg(ids?: string[]): string
 }
 
@@ -95,7 +99,12 @@ const api: SquigAgentApi = {
     const before = current()
     const after = addNodes(before, nodes)
     const ids = after.order.slice(before.order.length)
-    useSquig.getState().addNodes(ids.map((id) => after.nodes[id]))
+    const store = useSquig.getState()
+    store.addNodes(ids.map((id) => after.nodes[id]))
+    // the store selects everything it was handed, and a locked layer must
+    // never be in the selection or Delete takes the backdrop with it
+    const loose = ids.filter((id) => !after.nodes[id].locked)
+    if (loose.length !== ids.length) store.setSelection(loose)
     return ids
   },
   addComponent: (kind, at) => api.add([componentNode(kind, at)])[0],
@@ -104,7 +113,14 @@ const api: SquigAgentApi = {
   addArrow: (opts) => api.add([arrowNode(opts, useSquig.getState().nodes)])[0],
 
   update(id, patch) {
-    useSquig.getState().updateNode(id, updateNode(current(), id, patch).nodes[id])
+    const next = updateNode(current(), id, patch).nodes[id]
+    const store = useSquig.getState()
+    // updateNode on its own is the store's mid-drag write and takes no
+    // checkpoint; an agent's change is a finished edit, so it gets one
+    store.edit(() => {
+      store.updateNode(id, next)
+      if (next.locked && store.selection.includes(id)) store.setSelection(store.selection.filter((i) => i !== id))
+    })
   },
   remove: (ids) => useSquig.getState().removeNodes(ids),
 

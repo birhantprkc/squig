@@ -251,6 +251,34 @@ check("the copied arrow binds to the copies", (() => {
   return n.type === "arrow" && same(n.bind, cloned.createdIds.slice(0, 2))
 })())
 
+// -- grouping is whatever ⌘G does -------------------------------------------
+
+const grouped = applyOperations(
+  d,
+  operation.array().parse([{ op: "group", ids: ["a", "b"] }]),
+).document
+check("both members carry the one new group", (() => {
+  const path = grouped.nodes.a.groupIds
+  return !!path && path.length === 1 && same(path, grouped.nodes.b.groupIds)
+})())
+check("and nobody else joined it", grouped.nodes.c.groupIds === undefined)
+check(
+  "grouping the same pair again has nothing to do",
+  refused(() =>
+    applyOperations(
+      grouped,
+      operation.array().parse([{ op: "group", ids: ["a", "b"] }]),
+    ),
+  ),
+)
+check(
+  "deleting one of two leaves the other ungrouped",
+  applyOperations(
+    grouped,
+    operation.array().parse([{ op: "delete", ids: ["a"] }]),
+  ).document.nodes.b.groupIds === undefined,
+)
+
 // -- arranging --------------------------------------------------------------
 
 const arranged = applyOperations(
@@ -629,6 +657,62 @@ check(
   measuredCharacters < 300000,
   `${measuredCharacters} characters measured`,
 )
+const { textNode } = await import("../lib/doc.ts")
+const noteText = "Wide words wrap here and keep going for a while yet"
+const noteAt = {
+  x: 0,
+  y: 0,
+  w: 200,
+  fontSize: 18,
+  boxed: true,
+  boxFill: "light",
+} as const
+const noteDoc = emptyDocument("Notes")
+const noted = applyOperations(
+  noteDoc,
+  operation.array().parse([{ op: "note", x: 0, y: 0, w: 200, text: noteText }]),
+)
+check(
+  "a note is wrapped by the faces the render uses",
+  noted.document.nodes[noted.createdIds[0]].h ===
+    textNode(noteText, noteAt, textMeasurer(noteDoc.look.font)).h,
+)
+check(
+  "…which is not the em-ratio guess a browserless caller gets",
+  textNode(noteText, noteAt).h !==
+    textNode(noteText, noteAt, textMeasurer(noteDoc.look.font)).h,
+)
+const fixedWidth = applyOperations(
+  emptyDocument("Hug"),
+  operation.array().parse([
+    {
+      op: "add",
+      nodes: [
+        {
+          id: "t",
+          type: "text",
+          x: 0,
+          y: 0,
+          w: 60,
+          h: 40,
+          fixedW: true,
+          text: "Hug these words",
+          fontSize: 20,
+        },
+      ],
+    },
+  ]),
+).document
+const hugging = applyOperations(
+  fixedWidth,
+  operation
+    .array()
+    .parse([{ op: "update", patches: [{ id: "t", unset: ["fixedW"] }] }]),
+).document
+check("unsetting fixedW puts the box back around the words", (() => {
+  const n = hugging.nodes.t
+  return n.type === "text" && !n.fixedW && n.w > fixedWidth.nodes.t.w
+})())
 
 // -- WebP is accepted by the canvas and must survive agent PNG previews -----
 

@@ -1,11 +1,23 @@
 import { lookSchema, nodeFields } from "./schema"
 import { nanoid } from "nanoid"
-import { validNode } from "@/lib/clipboard-payload"
+import {
+  DocError,
+  addNodes,
+  bringToFront,
+  emptyDoc,
+  groupNodes,
+  removeNodes,
+  sendToBack,
+  textNode,
+  updateNode,
+  vouchNode,
+} from "@/lib/doc"
+import { textMeasurer } from "./text-metrics"
 import { getDef } from "@/lib/library/registry"
 import { breakApart } from "@/lib/library/break-apart"
 import { settleBinds, remapBinds } from "@/lib/canvas/arrow-binding"
 import { unionBox, type SquigNode, type SquigDoc } from "@/lib/types"
-import { DEFAULT_LOOK, THEMES, type Look } from "@/lib/theme"
+import { THEMES, type Look } from "@/lib/theme"
 import type { Operation } from "./schema"
 
 export class AgentError extends Error {
@@ -26,17 +38,31 @@ export interface CanvasDocument extends SquigDoc {
   variations: Variation[]
 }
 export function emptyDocument(name: string): CanvasDocument {
-  return {
-    fileName: name,
-    nodes: {},
-    order: [],
-    look: { ...DEFAULT_LOOK },
-    variations: [],
-  }
+  return { ...emptyDoc(name), variations: [] }
 }
 const safeId = (s: string) =>
   /^[a-zA-Z0-9_-]{1,80}$/.test(s) &&
   !["__proto__", "constructor", "prototype"].includes(s)
+/**
+ * lib/doc refuses in sentences; the workspace refuses in status codes. Every
+ * refusal here is something the caller sent, so it leaves as a 400 — except a
+ * name that is already on the sheet, which this API has always answered 409.
+ */
+function withDoc<T>(fn: () => T): T {
+  try {
+    return fn()
+  } catch (error) {
+    if (!(error instanceof DocError)) throw error
+    const taken = error.message.startsWith("there is already a node called")
+    throw new AgentError(taken ? 409 : 400, error.message)
+  }
+}
+/**
+ * A node from an agent's JSON. Zod is the boundary — its messages name the
+ * field and the API documents them — and the prefill is what the workspace
+ * assumes when a caller leaves a field out. Everything past that is a node
+ * rule, and node rules live in lib/doc.
+ */
 export function cleanNode(raw: Record<string, unknown>): SquigNode {
   const parsed = nodeFields.safeParse(raw)
   if (!parsed.success)
@@ -55,64 +81,20 @@ export function cleanNode(raw: Record<string, unknown>): SquigNode {
       400,
       `Unknown component: ${raw.kind}. Search catalog first.`,
     )
-  const n = validNode({
-    seed: 1,
-    id: nanoid(12),
-    w: def?.size.w ?? 160,
-    h: def?.size.h ?? 80,
-    ...(raw.type === "text" ? { fontSize: 20, text: "" } : {}),
-    ...(raw.type === "shape" ? { shape: "rect", fill: "none" } : {}),
-    ...raw,
-    ...(def
-      ? { props: { ...def.defaults, ...((raw.props as object) ?? {}) } }
-      : {}),
-  })
-  if (
-    !n ||
-    !safeId(n.id) ||
-    [n.x, n.y, n.w, n.h].some((v) => Math.abs(v) > 100000)
+  return withDoc(() =>
+    vouchNode({
+      seed: 1,
+      id: nanoid(12),
+      w: def?.size.w ?? 160,
+      h: def?.size.h ?? 80,
+      ...(raw.type === "text" ? { fontSize: 20, text: "" } : {}),
+      ...(raw.type === "shape" ? { shape: "rect", fill: "none" } : {}),
+      ...raw,
+      ...(def
+        ? { props: { ...def.defaults, ...((raw.props as object) ?? {}) } }
+        : {}),
+    }),
   )
-    throw new AgentError(400, "Invalid node or geometry")
-  if (n.type === "text" && (n.fontSize <= 0 || n.fontSize > 1000))
-    throw new AgentError(400, "fontSize must be 1–1000")
-  if (
-    n.type === "image" &&
-    (!/^data:image\/(png|jpeg|webp|gif);base64,/i.test(n.src) ||
-      !Number.isFinite(n.naturalW) ||
-      !Number.isFinite(n.naturalH) ||
-      n.naturalW <= 0 ||
-      n.naturalH <= 0)
-  )
-    throw new AgentError(
-      400,
-      "Images require a raster data URL and positive naturalW/naturalH",
-    )
-  if (n.type === "component") {
-    try {
-      def!.render(n.props, n.w, n.h)
-    } catch {
-      throw new AgentError(400, `Invalid properties for ${n.kind}`)
-    }
-    for (const c of def!.controls) {
-      const v = n.props[c.key]
-      if (v === undefined) continue
-      if (c.type === "select" && c.options && !c.options.includes(String(v)))
-        throw new AgentError(400, `Invalid ${n.kind}.${c.key}`)
-      if (
-        c.type === "number" &&
-        (typeof v !== "number" ||
-          !Number.isFinite(v) ||
-          (c.min !== undefined && v < c.min) ||
-          (c.max !== undefined && v > c.max))
-      )
-        throw new AgentError(400, `Invalid ${n.kind}.${c.key}`)
-      if (c.type === "toggle" && typeof v !== "boolean")
-        throw new AgentError(400, `Invalid ${n.kind}.${c.key}`)
-      if ((c.type === "text" || c.type === "icon") && typeof v !== "string")
-        throw new AgentError(400, `Invalid ${n.kind}.${c.key}`)
-    }
-  }
-  return n
 }
 export function validateDocument(doc: CanvasDocument): CanvasDocument {
   lookSchema.parse(doc.look)
@@ -145,7 +127,12 @@ export function applyOperations(
   original: CanvasDocument,
   operations: Operation[],
 ): { document: CanvasDocument; createdIds: string[] } {
-  const d = structuredClone(original)
+  // lib/doc hands back a new document every time, but align, distribute and
+  // flip still write through the node objects, so the batch owns a copy and a
+  // refused operation leaves the caller's document where it was.
+  let d = structuredClone(original)
+  // the real faces, so a note wraps here exactly where the render breaks it
+  const measure = textMeasurer(original.look.font)
   const createdIds: string[] = []
   const members = (ids: string[], allowLocked = false) =>
     [...new Set(ids)].map((id) => {
@@ -156,32 +143,34 @@ export function applyOperations(
         throw new AgentError(409, `Node is locked: ${id}; unlock it explicitly`)
       return n
     })
-  const add = (raw: Record<string, unknown>) => {
-    const n = cleanNode(raw)
-    if (Object.hasOwn(d.nodes, n.id))
-      throw new AgentError(409, `Duplicate node ID: ${n.id}`)
-    d.nodes[n.id] = n
-    d.order.push(n.id)
-    createdIds.push(n.id)
+  // one call per batch of new nodes: a group only survives the trip if all of
+  // its members arrive together, since a group of one is not a group
+  const place = (nodes: readonly SquigNode[]) => {
+    d = withDoc(() => addNodes(d, nodes)) as CanvasDocument
+    for (const n of nodes) createdIds.push(n.id)
   }
   for (const op of operations) {
     switch (op.op) {
       case "add":
-        op.nodes.forEach(add)
+        place(op.nodes.map((n) => cleanNode(n as Record<string, unknown>)))
         break
       case "note":
-        add({
-          type: "text",
-          x: op.x,
-          y: op.y,
-          w: op.w,
-          h: Math.max(100, Math.ceil(op.text.length / 25) * 26),
-          text: op.text,
-          fontSize: 18,
-          boxed: true,
-          boxFill: "light",
-          fixedW: true,
-        })
+        place([
+          withDoc(() =>
+            textNode(
+              op.text,
+              {
+                x: op.x,
+                y: op.y,
+                w: op.w,
+                fontSize: 18,
+                boxed: true,
+                boxFill: "light",
+              },
+              measure,
+            ),
+          ),
+        ])
         break
       case "rename":
         d.fileName = op.name
@@ -210,23 +199,21 @@ export function applyOperations(
       }
       case "update":
         for (const { id, patch, unset } of op.patches) {
-          const n = members(
+          members(
             [id],
             patch.locked === false &&
               Object.keys(patch).length === 1 &&
               !unset?.length,
-          )[0]
+          )
           if (patch.id !== undefined || patch.type !== undefined)
             throw new AgentError(400, "Node id and type are immutable")
-          const next: Record<string, unknown> = {
-            ...n,
+          const changes = {
             ...patch,
-            ...(n.type === "component" && patch.props
-              ? { props: { ...n.props, ...(patch.props as object) } }
-              : {}),
-          }
-          for (const field of unset ?? []) delete next[field]
-          d.nodes[id] = cleanNode(next)
+            ...Object.fromEntries((unset ?? []).map((f) => [f, undefined])),
+          } as Partial<SquigNode>
+          d = withDoc(() =>
+            updateNode(d, id, changes, measure),
+          ) as CanvasDocument
         }
         break
       case "remove_variation":
@@ -234,12 +221,11 @@ export function applyOperations(
           throw new AgentError(404, "Variation not found")
         d.variations = d.variations.filter((v) => v.id !== op.id)
         break
-      case "delete":
-        members(op.ids).forEach((n) => {
-          delete d.nodes[n.id]
-        })
-        d.order = d.order.filter((id) => !op.ids.includes(id))
+      case "delete": {
+        const ids = members(op.ids).map((n) => n.id)
+        d = withDoc(() => removeNodes(d, ids)) as CanvasDocument
         break
+      }
       case "duplicate": {
         const originals = members(op.ids, true)
         const ids = new Map(originals.map((n) => [n.id, nanoid(12)]))
@@ -256,14 +242,20 @@ export function applyOperations(
           groupIds: n.groupIds?.map((g) => groups.get(g)!),
         }))
         remapBinds(clones, ids)
-        clones.forEach((n) => add(n as unknown as Record<string, unknown>))
+        place(
+          clones.map((n) => cleanNode(n as unknown as Record<string, unknown>)),
+        )
         break
       }
       case "group": {
-        const g = op.groupId ?? nanoid(12)
-        members(op.ids).forEach((n) => {
-          n.groupIds = [g, ...(n.groupIds ?? []).filter((id) => id !== g)]
-        })
+        members(op.ids, true)
+        const grouped = withDoc(() => groupNodes(d, op.ids, op.groupId))
+        if (!grouped)
+          throw new AgentError(
+            400,
+            "Nothing to group: needs two or more unlocked nodes that are not already one group",
+          )
+        d = grouped.doc as CanvasDocument
         break
       }
       case "ungroup":
@@ -274,16 +266,20 @@ export function applyOperations(
       case "detach":
         for (const n of members(op.ids)) {
           if (n.type !== "component") continue
-          const index = d.order.indexOf(n.id)
-          const parts = breakApart(n)
-          delete d.nodes[n.id]
-          d.order.splice(index, 1)
-          for (const p of parts) {
-            p.groupIds = n.groupIds
-            add(p as unknown as Record<string, unknown>)
-          }
-          if (parts.length) d.order.splice(-parts.length)
-          d.order.splice(index, 0, ...parts.map((p) => p.id))
+          const at = d.order.indexOf(n.id)
+          const parts = breakApart(n).map((p) =>
+            cleanNode({
+              ...p,
+              groupIds: n.groupIds,
+            } as unknown as Record<string, unknown>),
+          )
+          d = withDoc(() => removeNodes(d, [n.id])) as CanvasDocument
+          place(parts)
+          // the parts landed on top; they belong where the component stood
+          const ids = parts.map((p) => p.id)
+          const fresh = new Set(ids)
+          const rest = d.order.filter((id) => !fresh.has(id))
+          d = { ...d, order: [...rest.slice(0, at), ...ids, ...rest.slice(at)] }
         }
         break
       case "flip":
@@ -340,13 +336,13 @@ export function applyOperations(
         break
       }
       case "reorder": {
-        members(op.ids)
-        const ids = new Set(op.ids),
-          selected = d.order.filter((id) => ids.has(id)),
-          other = d.order.filter((id) => !ids.has(id))
-        if (op.position === "front") d.order = [...other, ...selected]
-        else if (op.position === "back") d.order = [...selected, ...other]
+        const picked = members(op.ids).map((n) => n.id)
+        if (op.position === "front")
+          d = bringToFront(d, picked) as CanvasDocument
+        else if (op.position === "back")
+          d = sendToBack(d, picked) as CanvasDocument
         else {
+          const ids = new Set(picked)
           const forward = op.position === "forward"
           const order = forward ? [...d.order].reverse() : [...d.order]
           for (let i = 1; i < order.length; i++)

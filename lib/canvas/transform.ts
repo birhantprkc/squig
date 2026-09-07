@@ -37,7 +37,7 @@ export interface Mirrored {
  *
  * A flip in squig is a property of the node rather than of anything inside it:
  * the stored geometry never turns over, the renderer mirrors the whole box on
- * the way out (mirrorBox in canvas/sketch, mirrorPrims in sketch/kit). Which
+ * the way out (mirrorBox in sketch/paths, mirrorPrims in sketch/kit). Which
  * leaves every module in here holding coordinates that sit half a mirror away
  * from what the user is pointing at — the reason clicking a flipped arrow used
  * to miss it by the width of its own box, and the reason crop mode trimmed the

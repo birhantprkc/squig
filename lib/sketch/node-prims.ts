@@ -61,7 +61,7 @@ function outline(node: Outlined, baseWidth: number, o?: PrimOpts): PrimOpts {
 }
 
 /** A node's prims before any flip is applied. */
-export function basePrims(node: SquigNode): Prim[] {
+function basePrims(node: SquigNode): Prim[] {
   switch (node.type) {
     case "component":
       return renderComponent(node.kind, node.props, node.w, node.h)

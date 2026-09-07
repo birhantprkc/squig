@@ -6,6 +6,7 @@
 import type { Prim } from "@/lib/sketch/kit"
 import { rect, ellipse, line, text, icon, place, loremLines, truncate } from "@/lib/sketch/kit"
 import type { ComponentDef, Props } from "./registry"
+import { sub } from "./compose"
 import { buttonDef, inputDef, checkboxDef, switchDef, avatarDef } from "./defs-basic"
 import { chartDef, tableDef, dividerDef } from "./defs-display"
 import { navbarDef, sidebarDef } from "./defs-nav"
@@ -37,10 +38,6 @@ const listOr = (p: Props, k: string, stock: readonly string[]): string[] => {
   const given = str(p, k, "").split(",").map((s) => s.trim())
   const n = Math.max(stock.length, given.length)
   return Array.from({ length: n }, (_, i) => given[i] || stock[i % stock.length])
-}
-
-function sub(def: ComponentDef, props: Props, x: number, y: number, w: number, h: number): Prim[] {
-  return place(def.render({ ...def.defaults, ...props }, w, h), x, y)
 }
 
 // The height each screen is drawn for. A template laid out against a fraction

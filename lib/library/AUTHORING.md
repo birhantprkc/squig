@@ -104,11 +104,8 @@ The look is **refined hand-drawn** — closer to FigJam/tldraw than to a napkin.
 Import other defs and compose them — this is how blocks are built:
 
 ```ts
+import { sub } from "./compose"
 import { buttonDef, inputDef } from "./defs-basic"
-
-function sub(def: ComponentDef, props: Props, x: number, y: number, w: number, h: number) {
-  return place(def.render({ ...def.defaults, ...props }, w, h), x, y)
-}
 
 // inside render:
 prims.push(...sub(buttonDef, { label: "Get started", variant: "filled" }, 24, y, 140, 40))

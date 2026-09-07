@@ -18,7 +18,7 @@ const seed = () => Math.floor(Math.random() * 2 ** 31)
  * The inverse of the renderer's FILL_OPTS, and it has to stay that way: a card
  * that broke apart into flat "filled" boxes would lose the tonal step between
  * its inert areas and its emphasised ones, which is most of what the card was
- * saying. Mirrors SHADE_FOR in components/canvas/sketch.tsx.
+ * saying. Mirrors SHADE_FOR in lib/sketch/paths.ts.
  */
 function fillToneOf(o: PrimOpts | undefined): FillTone {
   if (!o?.fill || o.fill === "none") return "none"

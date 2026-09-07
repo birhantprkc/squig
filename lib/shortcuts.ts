@@ -7,7 +7,7 @@
 // can't drift apart.
 // ---------------------------------------------------------------------------
 
-export function isMac(): boolean {
+function isMac(): boolean {
   if (typeof navigator === "undefined") return true
   return /mac|iphone|ipad|ipod/i.test(navigator.userAgent)
 }
@@ -60,7 +60,7 @@ export function kbd(spec: string): string {
   return mac ? printed.join(wordy ? " " : "") : printed.join("+")
 }
 
-export interface ShortcutRow {
+interface ShortcutRow {
   keys: string[]
   label: string
 }

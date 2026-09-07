@@ -25,7 +25,7 @@
 // raster has a ceiling — see rasterScale — and a vector doesn't.
 // ---------------------------------------------------------------------------
 
-import { imagePlacement, mirrorBox, mirrorGlyphs, primsToPaths } from "@/components/canvas/sketch"
+import { imagePlacement, mirrorBox, mirrorGlyphs, primsToPaths } from "./sketch/paths"
 import { copiedSurface, svgDocument, type ExportDrawing, type ExportSurface } from "./export-image-document"
 import { downloadBlob } from "./file-io"
 import { iconPathsReady, loadIconWeight, normalizeIconWeight } from "./sketch/icon-catalog"
@@ -44,9 +44,9 @@ const SCALE = 2
 /** browsers refuse canvases past ~16k; stay well under and scale down instead */
 const MAX_SIDE = 8192
 
-export type CopyResult = "copied" | "downloaded" | "empty" | "failed"
+type CopyResult = "copied" | "downloaded" | "empty" | "failed"
 
-export interface CopyOutcome {
+interface CopyOutcome {
   status: CopyResult
   /** nothing was selected, so the whole canvas went instead */
   whole: boolean
@@ -57,7 +57,7 @@ export interface CopyOutcome {
 /** The two file formats a drawing can leave as. */
 export type ImageFormat = "png" | "svg"
 
-export interface SaveOutcome {
+interface SaveOutcome {
   status: "saved" | "empty" | "failed"
   format: ImageFormat
   /** nothing was selected, so the whole canvas went instead */
@@ -291,7 +291,7 @@ async function rasterize(svg: string, w: number, h: number): Promise<Blob> {
  * is picked. ⌘⇧C and both save commands share it so that picking one thing and
  * reaching for the menu can't quietly hand you the other.
  */
-export function pngTargets(): { nodes: SquigNode[]; whole: boolean } {
+function pngTargets(): { nodes: SquigNode[]; whole: boolean } {
   const { nodes, order, selection } = useSquig.getState()
   const picked = order.filter((id) => selection.includes(id)).map((id) => nodes[id]).filter(Boolean)
   if (picked.length) return { nodes: picked, whole: false }
@@ -356,7 +356,7 @@ function rasterScale(w: number, h: number): number {
 }
 
 /** Render a set of nodes to a PNG blob, and say how big it managed to be. */
-export async function renderPng(
+async function renderPng(
   list: SquigNode[],
   options: { surface?: ExportSurface } = {}
 ): Promise<{ blob: Blob; scale: number }> {
@@ -371,7 +371,7 @@ export async function renderPng(
  * Render a set of nodes to an SVG blob — life size, because a vector has no
  * size to pick and every tool that opens it will scale it anyway.
  */
-export async function renderSvg(list: SquigNode[]): Promise<Blob> {
+async function renderSvg(list: SquigNode[]): Promise<Blob> {
   const d = await draw(list)
   // the prolog is optional for anything served as image/svg+xml, but a file on
   // disk gets opened by things that sniff the first line instead, so it stays
@@ -386,7 +386,7 @@ export async function renderSvg(list: SquigNode[]): Promise<Blob> {
  * awaiting one. A browser that won't take an image lands on a download instead
  * — the sketch still leaves the app, just through the other door.
  */
-export function copySelectionAsPng(): Promise<CopyOutcome> {
+function copySelectionAsPng(): Promise<CopyOutcome> {
   const { nodes, whole } = pngTargets()
   if (!nodes.length) return Promise.resolve({ status: "empty", whole })
 
@@ -430,7 +430,7 @@ export function copySelectionAsPng(): Promise<CopyOutcome> {
  * Save PNG / Save SVG. Same targets as ⌘⇧C, and the same document underneath —
  * the SVG is simply the step the PNG throws away.
  */
-export async function saveSelectionAsImage(format: ImageFormat): Promise<SaveOutcome> {
+async function saveSelectionAsImage(format: ImageFormat): Promise<SaveOutcome> {
   const { nodes, whole } = pngTargets()
   if (!nodes.length) return { status: "empty", format, whole }
   try {
@@ -457,7 +457,7 @@ function clampedTail(scale: number | undefined): string {
 }
 
 /** One wording for the flash, wherever the command was run from. */
-export function copyNotice({ status, whole, scale }: CopyOutcome): string {
+function copyNotice({ status, whole, scale }: CopyOutcome): string {
   switch (status) {
     case "copied":
       return (whole ? "copied the whole canvas as a PNG" : "copied as a PNG") + clampedTail(scale)
@@ -473,7 +473,7 @@ export function copyNotice({ status, whole, scale }: CopyOutcome): string {
 }
 
 /** The same, for the two save commands. */
-export function saveNotice({ status, format, whole, scale }: SaveOutcome): string {
+function saveNotice({ status, format, whole, scale }: SaveOutcome): string {
   const kind = format === "svg" ? "an SVG" : "a PNG"
   switch (status) {
     case "saved":

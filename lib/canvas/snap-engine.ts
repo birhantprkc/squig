@@ -34,22 +34,6 @@ export interface GuideLine {
   end: number
 }
 
-/** A distance indicator between two edges. */
-interface DistanceIndicator {
-  axis: "x" | "y"
-  /** Pixel distance */
-  distance: number
-  /** Line start */
-  x1: number
-  y1: number
-  /** Line end */
-  x2: number
-  y2: number
-  /** Label position */
-  labelX: number
-  labelY: number
-}
-
 /** Result of a snap calculation. */
 export interface SnapResult {
   /** Screen-space delta to apply */
@@ -57,8 +41,6 @@ export interface SnapResult {
   dy: number
   /** Guide lines to render */
   guides: GuideLine[]
-  /** Distance indicators to render */
-  distances: DistanceIndicator[]
 }
 
 // ---------------------------------------------------------------------------
@@ -206,7 +188,7 @@ export function computeSnap(
     })
   }
 
-  return { dx, dy, guides, distances: [] }
+  return { dx, dy, guides }
 }
 
 // ---------------------------------------------------------------------------
@@ -325,5 +307,5 @@ export function computeResizeSnap(
     guides.push({ axis: "y", position: match.pos, start: minX, end: maxX })
   }
 
-  return { dx, dy, guides, distances: [] }
+  return { dx, dy, guides }
 }

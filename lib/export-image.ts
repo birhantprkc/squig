@@ -25,28 +25,20 @@
 // raster has a ceiling — see rasterScale — and a vector doesn't.
 // ---------------------------------------------------------------------------
 
-import { imagePlacement, mirrorBox, mirrorGlyphs, primsToPaths } from "@/components/canvas/sketch"
+import { drawNodes, loadIconsFor } from "./sketch/svg"
 import { copiedSurface, svgDocument, type ExportDrawing, type ExportSurface } from "./export-image-document"
 import { downloadBlob } from "./file-io"
-import { iconPathsReady, loadIconWeight, normalizeIconWeight } from "./sketch/icon-catalog"
-import { INK, resolveIconName } from "./sketch/kit"
-import { nodePrims } from "./sketch/node-prims"
-import { unionBounds } from "./selection"
 import { useSquig } from "./store"
-import { paletteOf, type Palette } from "./theme"
 import type { SquigNode } from "./types"
-import { nodeVisualBounds } from "./canvas/line-routing"
 
-/** breathing room around the art, in world units — rough strokes overshoot */
-const PAD = 12
 /** retina by default: a wireframe pasted into a doc gets read at 1×, not 2× */
 const SCALE = 2
 /** browsers refuse canvases past ~16k; stay well under and scale down instead */
 const MAX_SIDE = 8192
 
-export type CopyResult = "copied" | "downloaded" | "empty" | "failed"
+type CopyResult = "copied" | "downloaded" | "empty" | "failed"
 
-export interface CopyOutcome {
+interface CopyOutcome {
   status: CopyResult
   /** nothing was selected, so the whole canvas went instead */
   whole: boolean
@@ -57,104 +49,12 @@ export interface CopyOutcome {
 /** The two file formats a drawing can leave as. */
 export type ImageFormat = "png" | "svg"
 
-export interface SaveOutcome {
+interface SaveOutcome {
   status: "saved" | "empty" | "failed"
   format: ImageFormat
   /** nothing was selected, so the whole canvas went instead */
   whole: boolean
   scale?: number
-}
-
-// -- the SVG document --------------------------------------------------------
-
-function esc(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-}
-
-/** `var(--sq-ink)` → `#2438FF`. Anything else passes through untouched. */
-function makeResolver(p: Palette): (paint: string) => string {
-  const vars: Record<string, string> = {
-    "--sq-bg": p.bg,
-    "--sq-paper": p.paper,
-    "--sq-ink": p.ink,
-    "--sq-muted": p.muted,
-    "--sq-faint": p.faint,
-    "--sq-shade": p.shade,
-    "--sq-shade-strong": p.shadeStrong,
-    "--sq-grid": p.grid,
-    "--sq-select": p.select,
-  }
-  return (paint) => paint.replace(/var\((--[\w-]+)\)/g, (whole, name: string) => vars[name] ?? whole)
-}
-
-/**
- * One node, as SVG markup.
- *
- * Deliberately a mirror of what SketchPrims renders — same paths, same
- * attributes, same order. It is duplicated rather than run through
- * react-dom/server because pulling a server renderer into the client bundle to
- * print thirty lines of markup is a poor trade.
- */
-function nodeMarkup(node: SquigNode, resolve: (paint: string) => string, font: string): string {
-  const { paths, texts, crisp } = primsToPaths(nodePrims(node), node.seed)
-  const out: string[] = []
-
-  // A pasted picture is the one node that isn't made of marks, so it has to be
-  // written out itself or the PNG comes back with an empty frame where the
-  // screenshot was. Its pixels are already a data URL, which is both what
-  // makes the SVG standalone and what keeps the canvas untainted when this is
-  // rasterised — an external src would do neither.
-  if (node.type === "image") {
-    const mirror = mirrorBox(node.w, node.h, node.flipX, node.flipY)
-    const p = imagePlacement(node)
-    // the nested <svg> is the crop, exactly as the canvas draws it — a viewport
-    // the size of the box, trimming a picture laid out larger than it
-    out.push(
-      `<svg x="0" y="0" width="${node.w}" height="${node.h}" overflow="hidden">` +
-        `<g${mirror ? ` transform="${esc(mirror)}"` : ""}>` +
-        `<image href="${esc(node.src)}" x="${p.x}" y="${p.y}" width="${p.w}" height="${p.h}"` +
-        ` preserveAspectRatio="none"/>` +
-        `</g></svg>`
-    )
-  }
-
-  for (const p of paths) {
-    out.push(
-      `<path d="${esc(p.d)}" stroke="${resolve(p.stroke)}" stroke-width="${p.strokeWidth}" fill="${resolve(p.fill)}"` +
-        `${p.dash ? ` stroke-dasharray="${p.dash}"` : ""} stroke-linecap="round" stroke-linejoin="round"/>`
-    )
-  }
-
-  for (const c of crisp) {
-    const paint = resolve(c.color)
-    const bits = c.d
-      .map(
-        (d) =>
-          `<path d="${esc(d)}" fill="${c.mode === "fill" ? paint : "none"}" stroke="${c.mode === "stroke" ? paint : "none"}"` +
-          `${c.mode === "stroke" ? ` stroke-width="${c.strokeWidth}"` : ""} stroke-linecap="round" stroke-linejoin="round"/>`
-      )
-      .join("")
-    out.push(`<g transform="${esc(c.transform)}">${bits}</g>`)
-  }
-
-  for (const t of texts) {
-    const anchor = t.align === "center" ? "middle" : t.align === "right" ? "end" : "start"
-    // a flipped text layer turns its words over about their own anchor, and
-    // borrows the renderer's transform rather than working it out again
-    const mirror = mirrorGlyphs(t)
-    out.push(
-      `<text x="${t.x}" y="${t.y}" font-size="${t.size}" font-family="${esc(font)}" font-weight="${t.bold ? 700 : 400}"` +
-        `${t.italic ? ` font-style="italic"` : ""}${t.underline ? ` text-decoration="underline"` : ""}` +
-        ` fill="${resolve(INK[t.color ?? "ink"])}" text-anchor="${anchor}"` +
-        `${mirror ? ` transform="${esc(mirror)}"` : ""} xml:space="preserve">${esc(t.text)}</text>`
-    )
-  }
-
-  return `<g transform="translate(${node.x} ${node.y})">${out.join("")}</g>`
 }
 
 // -- fonts -------------------------------------------------------------------
@@ -291,7 +191,7 @@ async function rasterize(svg: string, w: number, h: number): Promise<Blob> {
  * is picked. ⌘⇧C and both save commands share it so that picking one thing and
  * reaching for the menu can't quietly hand you the other.
  */
-export function pngTargets(): { nodes: SquigNode[]; whole: boolean } {
+function pngTargets(): { nodes: SquigNode[]; whole: boolean } {
   const { nodes, order, selection } = useSquig.getState()
   const picked = order.filter((id) => selection.includes(id)).map((id) => nodes[id]).filter(Boolean)
   if (picked.length) return { nodes: picked, whole: false }
@@ -305,40 +205,15 @@ export function pngTargets(): { nodes: SquigNode[]; whole: boolean } {
  */
 /** Draw a set of nodes, on the current theme's paper. */
 async function draw(list: SquigNode[]): Promise<ExportDrawing> {
-  // Routed connectors can bow or dogleg outside the endpoint box stored on
-  // the node. Measure those visible paths so exports never crop a manual bend.
-  const measured = list.map(nodeVisualBounds)
-  const b = unionBounds(measured)
-  if (!b) throw new Error("nothing to draw")
+  if (!list.length) throw new Error("nothing to draw")
+
+  await loadIconsFor(list)
 
   const s = useSquig.getState()
-  const palette = paletteOf(s.theme)
-  const resolve = makeResolver(palette)
   const font = canvasFontStack()
-  const css = await fontFaceCss(font)
-
-  // icon paths stream in from lazy chunks; the on-screen canvas can redraw
-  // when they land, but this render is one-shot — so wait for every weight the
-  // picture needs before printing it. Only icon nodes can name arbitrary
-  // glyphs; every other def draws from the curated inline set.
-  const weights = new Set<ReturnType<typeof normalizeIconWeight>>()
-  for (const n of list) {
-    if (n.type !== "component" || n.kind !== "icon") continue
-    const w = normalizeIconWeight(n.props.weight)
-    const resolved = resolveIconName(String(n.props.name ?? ""))
-    if (resolved && !iconPathsReady(resolved, w)) weights.add(w)
-  }
-  await Promise.all([...weights].map((w) => loadIconWeight(w)))
-
-  return {
-    body: list.map((n) => nodeMarkup(n, resolve, font)).join(""),
-    css,
-    x: b.x - PAD,
-    y: b.y - PAD,
-    w: Math.max(b.w + PAD * 2, 1),
-    h: Math.max(b.h + PAD * 2, 1),
-    paper: palette.bg,
-  }
+  const d = drawNodes(list, { theme: s.theme, paper: s.paper, font: s.font, grid: s.grid }, { font })
+  if (!d) throw new Error("nothing to draw")
+  return { ...d, css: await fontFaceCss(font) }
 }
 
 /**
@@ -356,7 +231,7 @@ function rasterScale(w: number, h: number): number {
 }
 
 /** Render a set of nodes to a PNG blob, and say how big it managed to be. */
-export async function renderPng(
+async function renderPng(
   list: SquigNode[],
   options: { surface?: ExportSurface } = {}
 ): Promise<{ blob: Blob; scale: number }> {
@@ -371,7 +246,7 @@ export async function renderPng(
  * Render a set of nodes to an SVG blob — life size, because a vector has no
  * size to pick and every tool that opens it will scale it anyway.
  */
-export async function renderSvg(list: SquigNode[]): Promise<Blob> {
+async function renderSvg(list: SquigNode[]): Promise<Blob> {
   const d = await draw(list)
   // the prolog is optional for anything served as image/svg+xml, but a file on
   // disk gets opened by things that sniff the first line instead, so it stays
@@ -386,7 +261,7 @@ export async function renderSvg(list: SquigNode[]): Promise<Blob> {
  * awaiting one. A browser that won't take an image lands on a download instead
  * — the sketch still leaves the app, just through the other door.
  */
-export function copySelectionAsPng(): Promise<CopyOutcome> {
+function copySelectionAsPng(): Promise<CopyOutcome> {
   const { nodes, whole } = pngTargets()
   if (!nodes.length) return Promise.resolve({ status: "empty", whole })
 
@@ -430,7 +305,7 @@ export function copySelectionAsPng(): Promise<CopyOutcome> {
  * Save PNG / Save SVG. Same targets as ⌘⇧C, and the same document underneath —
  * the SVG is simply the step the PNG throws away.
  */
-export async function saveSelectionAsImage(format: ImageFormat): Promise<SaveOutcome> {
+async function saveSelectionAsImage(format: ImageFormat): Promise<SaveOutcome> {
   const { nodes, whole } = pngTargets()
   if (!nodes.length) return { status: "empty", format, whole }
   try {
@@ -457,7 +332,7 @@ function clampedTail(scale: number | undefined): string {
 }
 
 /** One wording for the flash, wherever the command was run from. */
-export function copyNotice({ status, whole, scale }: CopyOutcome): string {
+function copyNotice({ status, whole, scale }: CopyOutcome): string {
   switch (status) {
     case "copied":
       return (whole ? "copied the whole canvas as a PNG" : "copied as a PNG") + clampedTail(scale)
@@ -473,7 +348,7 @@ export function copyNotice({ status, whole, scale }: CopyOutcome): string {
 }
 
 /** The same, for the two save commands. */
-export function saveNotice({ status, format, whole, scale }: SaveOutcome): string {
+function saveNotice({ status, format, whole, scale }: SaveOutcome): string {
   const kind = format === "svg" ? "an SVG" : "a PNG"
   switch (status) {
     case "saved":

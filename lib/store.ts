@@ -3,8 +3,8 @@
 import { create } from "zustand"
 import { nanoid } from "nanoid"
 import type { ComponentNode, ImageNode, SquigNode, TextAlign, TextNode, TextVerticalAlign, Tool, Viewport, ShapeKind } from "./types"
-import { normalizeFill, screenToWorld, unionBox } from "./types"
-import { validNode } from "./clipboard-payload"
+import { screenToWorld, unionBox } from "./types"
+import { componentNode, DocError, parseDoc, sanitizeDoc, serializeDoc } from "./doc"
 import { remapBinds, settleBinds } from "./canvas/arrow-binding"
 import { nodeVisualBounds } from "./canvas/line-routing"
 import { cropTarget, isCropped, trueShapePatch, uncropPatch } from "./canvas/crop"
@@ -24,7 +24,6 @@ import {
   planGroupPaths,
   pruneDegenerateGroups,
 } from "./canvas/groups"
-import { getDef } from "./library/registry"
 import { breakApart } from "./library/break-apart"
 import {
   applyLook,
@@ -38,7 +37,6 @@ import {
   INDEX_KEY,
   deleteFile as dropFile,
   fileKey,
-  knownLook,
   listFiles,
   loadPrefs,
   migrateLegacyDoc,
@@ -70,14 +68,14 @@ interface DocSnapshot {
 
 export type PanelKind = "components" | "blocks" | null
 
-export interface ContextMenuState {
+interface ContextMenuState {
   x: number
   y: number
   /** node the menu was opened on, or null for the canvas itself */
   nodeId: string | null
 }
 
-export interface InspectorFocus {
+interface InspectorFocus {
   /** the selected component whose property should receive focus */
   id: string
   /** the component control key, not a DOM id */
@@ -403,54 +401,6 @@ function sameDoc(a: Doc, b: Doc): boolean {
 }
 
 /**
- * Everything a document has to survive before the canvas will draw it.
- *
- * The check itself is `validNode` — the same gate a paste goes through. There
- * used to be two of them, and the weaker one guarded the wider door: this
- * function looked at x/y/w/h and waved the rest past, while the clipboard's
- * looked at the node type, the points a line is made of, the words a label is
- * made of. So a .squig.json that had lost its `points` — a truncated export,
- * an older writer, a file somebody edited by hand — imported happily, threw on
- * the first render, and left no screen to fix it from. One gate now, on both
- * doors, which also means a node type only has to be vouched for in one place
- * the next time squig grows one.
- *
- * What stays here is the part no single node can answer for itself: the
- * boolean fill old shapes wrote, the z-order, and arrow ends that name nodes
- * this document turns out not to have.
- */
-function sanitize(
-  nodes: Record<string, SquigNode> | undefined,
-  order: string[] | undefined
-): { nodes: Record<string, SquigNode>; order: string[] } {
-  const clean: Record<string, SquigNode> = {}
-  for (const [id, raw] of Object.entries(nodes ?? {})) {
-    const node = validNode(raw)
-    if (!node) continue
-    // the key is the name the rest of the document knows this node by — the
-    // z-order, an arrow's binding and the selection all spell it that way.
-    // validNode calls an unnamed node "pasted", since a paste renames it on
-    // the way down; here the key is the name, so stamp it back on.
-    node.id = id
-    // shapes stored a boolean fill before they had a tonal ladder; upgrade on
-    // the way in so nothing downstream has to know the old spelling existed
-    if (node.type === "shape") node.fill = normalizeFill(node.fill)
-    clean[id] = node
-  }
-  const seen = new Set<string>()
-  const ord = (order ?? []).filter((id) => {
-    if (!clean[id] || seen.has(id)) return false
-    seen.add(id)
-    return true
-  })
-  for (const id of Object.keys(clean)) if (!seen.has(id)) ord.push(id)
-  // a stranger's document can bind an arrow to a node that was never in it, or
-  // to one the loop above just threw out. Those ends let go here, and the ones
-  // that survive get routed to wherever their boxes actually are.
-  return { nodes: settleBinds(pruneDegenerateGroups(clean)), order: ord }
-}
-
-/**
  * Is this the untouched draft the checkpoint on top just placed?
  *
  * The text editor opens on two nodes wearing identical clothes: a draft the
@@ -573,7 +523,7 @@ let seen: number | null = null
 let editing = false
 
 /** The four knobs that make up a look, gathered out of the flat state. */
-function lookOf(s: Pick<SquigState, "theme" | "paper" | "font" | "grid">): Look {
+export function lookOf(s: Pick<SquigState, "theme" | "paper" | "font" | "grid">): Look {
   return { theme: s.theme, paper: s.paper, font: s.font, grid: s.grid }
 }
 
@@ -713,7 +663,7 @@ function adoptDoc(get: () => SquigState) {
     stopWriting(get, "this drawing was removed in another tab — export to keep your copy")
     return
   }
-  const clean = sanitize(doc.nodes, doc.order)
+  const clean = sanitizeDoc(doc.nodes, doc.order)
   const s = get()
   const held = new Set(s.selection)
   useSquig.setState({
@@ -1350,7 +1300,7 @@ export const useSquig = create<SquigState>((set, get) => ({
     // last file open wins; failing that, the most recent one we have
     const wanted = prefs.activeId && files.some((f) => f.id === prefs.activeId) ? prefs.activeId : files[0]?.id
     const doc = wanted ? readFile(wanted) : null
-    const clean = sanitize(doc?.nodes, doc?.order)
+    const clean = sanitizeDoc(doc?.nodes, doc?.order)
 
     set({
       docId: doc?.id ?? nanoid(8),
@@ -1672,19 +1622,22 @@ export const useSquig = create<SquigState>((set, get) => ({
   },
 
   insertComponent: (kind, props) => {
-    const def = getDef(kind)
-    if (!def) return
     const v = get().viewport
     const [cx, cy] = screenToWorld(v, window.innerWidth / 2, window.innerHeight / 2)
+    let node
+    try {
+      node = componentNode(kind, { x: 0, y: 0, props })
+    } catch (e) {
+      // a kind nobody has heard of: the palette can only offer real ones, so
+      // this is a caller's typo rather than anything to interrupt a drawing for
+      if (e instanceof DocError) return
+      throw e
+    }
     get().addNode({
-      type: "component",
-      kind: def.kind,
-      props: { ...def.defaults, ...props },
-      x: Math.round(cx - def.size.w / 2),
-      y: Math.round(cy - def.size.h / 2),
-      w: def.size.w,
-      h: def.size.h,
-    } as Omit<SquigNode, "id" | "seed">)
+      ...node,
+      x: Math.round(cx - node.w / 2),
+      y: Math.round(cy - node.h / 2),
+    })
   },
 
   cloneSelectionInPlace: () => {
@@ -1859,7 +1812,7 @@ export const useSquig = create<SquigState>((set, get) => ({
       set({ files: dropFile(id) })
       return
     }
-    const clean = sanitize(doc.nodes, doc.order)
+    const clean = sanitizeDoc(doc.nodes, doc.order)
     set({
       docId: doc.id,
       fileName: doc.name,
@@ -1916,51 +1869,38 @@ export const useSquig = create<SquigState>((set, get) => ({
 
   serialize: () => {
     const s = get()
-    const { fileName, nodes, order } = s
-    return JSON.stringify({ app: "squig", version: 1, fileName, look: lookOf(s), nodes, order }, null, 2)
+    return serializeDoc({ fileName: s.fileName, look: lookOf(s), nodes: s.nodes, order: s.order })
   },
 
   loadDoc: (json) => {
-    try {
-      const doc = JSON.parse(json)
-      if (!doc || typeof doc !== "object" || !doc.nodes || !Array.isArray(doc.order)) return false
-      const clean = sanitize(doc.nodes, doc.order)
-      // A file that had layers and lost every one of them is not an empty
-      // drawing — it's a document squig can't read. Taking it anyway would
-      // trade the canvas you're looking at for a blank one, make that blank
-      // the file the drawer reopens, and leave nothing on screen to say why.
-      // A genuinely empty export still comes in: it had nothing to lose.
-      if (Object.keys(doc.nodes).length && !clean.order.length) return false
-      // an opened file joins the drawer as its own document, so importing
-      // never writes over whatever was on the canvas
-      flushSave(get)
-      set({
-        docId: nanoid(8),
-        fileName: typeof doc.fileName === "string" ? doc.fileName : "imported scribbles",
-        nodes: clean.nodes,
-        order: clean.order,
-        selection: [],
-        selectionGroupId: null,
-        croppingId: null,
-        renamingFile: false,
-        linkOpen: false,
-        past: [],
-        future: [],
-      })
-      // a fresh id, so this lands as its own document however the last one was
-      // getting on with the rest of the browser
-      nowSeeing(null)
-      // an import brings its author's ink and paper with it, when it has any
-      if (doc.look) wearLook(set, knownLook(doc.look, lookOf(get())))
-      // an imported file was drawn wherever its author left it — go there,
-      // or the canvas looks empty when it isn't
-      if (clean.order.length) fitBox(set, clean.order.map((id) => clean.nodes[id]), 1)
-      else set({ viewport: { x: 0, y: 0, zoom: 1 } })
-      scheduleSave(get)
-      return true
-    } catch {
-      return false
-    }
+    const doc = parseDoc(json, "imported scribbles", lookOf(get()))
+    if (!doc) return false
+    // an opened file joins the drawer as its own document, so importing
+    // never writes over whatever was on the canvas
+    flushSave(get)
+    set({
+      docId: nanoid(8),
+      fileName: doc.fileName,
+      nodes: doc.nodes,
+      order: doc.order,
+      selection: [],
+      selectionGroupId: null,
+      croppingId: null,
+      renamingFile: false,
+      linkOpen: false,
+      past: [],
+      future: [],
+    })
+    // a fresh id, so this lands as its own document however the last one was
+    // getting on with the rest of the browser
+    nowSeeing(null)
+    wearLook(set, doc.look)
+    // an imported file was drawn wherever its author left it — go there,
+    // or the canvas looks empty when it isn't
+    if (doc.order.length) fitBox(set, doc.order.map((id) => doc.nodes[id]), 1)
+    else set({ viewport: { x: 0, y: 0, zoom: 1 } })
+    scheduleSave(get)
+    return true
   },
 }))
 

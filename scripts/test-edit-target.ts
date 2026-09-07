@@ -21,14 +21,7 @@ import { ALL_DEFS, getDef } from "../lib/library/registry.ts"
 import { nodePrims } from "../lib/sketch/node-prims.ts"
 import type { Prim } from "../lib/sketch/kit.ts"
 import type { ComponentNode, SquigNode, TextNode } from "../lib/types.ts"
-
-let passed = 0
-const failures: string[] = []
-
-function check(name: string, cond: boolean, detail = "") {
-  if (cond) passed++
-  else failures.push(`${name}${detail ? ` — ${detail}` : ""}`)
-}
+import { check, report } from "./harness.ts"
 
 function is(name: string, got: unknown, want: unknown) {
   check(name, got === want, got === want ? "" : `got ${JSON.stringify(got)}, want ${JSON.stringify(want)}`)
@@ -326,9 +319,4 @@ function aimAt(node: ComponentNode, text: string, nth = 0): string | null {
 
 // ---------------------------------------------------------------------------
 
-if (failures.length) {
-  console.error(`\n✗ ${failures.length} failed, ${passed} passed\n`)
-  for (const f of failures) console.error("  ✗ " + f)
-  process.exit(1)
-}
-console.log(`✓ ${passed} edit-target checks passed`)
+report("edit-target checks passed")

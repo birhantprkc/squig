@@ -112,7 +112,7 @@ export function searchIcons(query: string, limit = 36): string[] {
 // -- suggestions ------------------------------------------------------------
 
 /** The icons people actually reach for — the empty-query grid. */
-export const POPULAR_ICONS: string[] = [
+const POPULAR_ICONS: string[] = [
   "star", "heart", "user", "house", "gear", "bell",
   "check", "x", "plus", "magnifying-glass", "envelope", "calendar-blank",
   "image", "trash", "lightning", "arrow-right", "chat-circle", "lock",

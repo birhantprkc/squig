@@ -1,4 +1,5 @@
 import rough from "roughjs"
+import { cropOf, type ImageNode } from "@/lib/types"
 import type { Options } from "roughjs/bin/core"
 import type { RoughGenerator } from "roughjs/bin/generator"
 import {
@@ -292,4 +293,34 @@ export function mirrorGlyphs(
   if (!t.mirrorX && !t.mirrorY) return undefined
   const [sx, sy] = [t.mirrorX ? -1 : 1, t.mirrorY ? -1 : 1]
   return `translate(${t.x * (1 - sx)} ${t.y * (1 - sy)}) scale(${sx} ${sy})`
+}
+
+/**
+ * Where the whole picture goes, in the node's own coordinates, so that the
+ * cropped part of it lands exactly on the box.
+ *
+ * With no crop that's (0, 0, w, h) — the picture fills its box, which is what
+ * every picture did before crops existed. With one it's bigger and offset up
+ * and left, and the nested `<svg>` above trims the overhang.
+ *
+ * Exported because the PNG export has to place the same pixels the same way,
+ * into a file rather than onto the canvas.
+ */
+export function imagePlacement(node: ImageNode): { x: number; y: number; w: number; h: number } {
+  const c = cropOf(node)
+  const w = node.w / c.w
+  const h = node.h / c.h
+  return { x: -c.x * w, y: -c.y * h, w, h }
+}
+
+/**
+ * Mirror a picture about its own box — the same flip mirrorPrims gives the
+ * marks, in SVG terms. Exported because the PNG export has to draw the same
+ * picture the same way round, into a file rather than onto the canvas.
+ */
+export function mirrorBox(w: number, h: number, flipX?: boolean, flipY?: boolean): string | undefined {
+  if (!flipX && !flipY) return undefined
+  const sx = flipX ? -1 : 1
+  const sy = flipY ? -1 : 1
+  return `translate(${flipX ? w : 0} ${flipY ? h : 0}) scale(${sx} ${sy})`
 }

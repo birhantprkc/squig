@@ -54,7 +54,7 @@ export const metadata: Metadata = {
     description,
     images: [
       {
-        url: "/twitter-image",
+        url: "/opengraph-image",
         width: 1200,
         height: 630,
         alt: "A blue doodle of a bear sketching a wireframe",

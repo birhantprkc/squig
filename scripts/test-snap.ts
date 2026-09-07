@@ -6,14 +6,7 @@
 // ---------------------------------------------------------------------------
 
 import { computeResizeSnap, computeSnap, makeSnapRect } from "../lib/canvas/snap-engine.ts"
-
-let passed = 0
-const failures: string[] = []
-
-function check(name: string, condition: boolean, detail = "") {
-  if (condition) passed++
-  else failures.push(`${name}${detail ? ` — ${detail}` : ""}`)
-}
+import { check, report } from "./harness.ts"
 
 const rect = (id: string, x: number, y: number, w = 40, h = 40) => makeSnapRect(id, x, y, w, h)
 
@@ -82,9 +75,4 @@ const rect = (id: string, x: number, y: number, w = 40, h = 40) => makeSnapRect(
 
 // ---------------------------------------------------------------------------
 
-if (failures.length) {
-  console.error(`\n✗ ${failures.length} failed, ${passed} passed\n`)
-  for (const failure of failures) console.error("  ✗ " + failure)
-  process.exit(1)
-}
-console.log(`✓ ${passed} smart-guide checks passed`)
+report("smart-guide checks passed")

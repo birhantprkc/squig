@@ -1,24 +1,13 @@
-import { primsToPaths, mirrorGlyphs } from "@/lib/sketch/paths"
-import { nodePrims } from "@/lib/sketch/node-prims"
-import { INK } from "@/lib/sketch/kit"
-import { paletteOf, bgOf } from "@/lib/theme"
-import { cropOf } from "@/lib/types"
-import { nodeVisualBounds } from "@/lib/canvas/line-routing"
+import { drawNodes, esc } from "@/lib/sketch/svg"
+import { bgOf, paletteOf } from "@/lib/theme"
 import { AgentError, type CanvasDocument } from "./engine"
 import path from "node:path"
 import { textMeasurer } from "./text-metrics"
-const escape = (value: unknown) =>
-  String(value).replace(
-    /[&<>"']/g,
-    (c) =>
-      ({
-        "&": "&amp;",
-        "<": "&lt;",
-        ">": "&gt;",
-        '"': "&quot;",
-        "'": "&apos;",
-      })[c]!,
-  )
+
+// More margin than the editor's export leaves: this picture is looked at on
+// its own rather than pasted into something else.
+const PAD = 32
+
 export function renderSvg(document: CanvasDocument, variationId?: string) {
   const variation = variationId
     ? document.variations.find((v) => v.id === variationId)
@@ -29,71 +18,25 @@ export function renderSvg(document: CanvasDocument, variationId?: string) {
   const nodes = document.order
     .filter((id) => ids.has(id))
     .map((id) => document.nodes[id])
-  const boxes = nodes.map(nodeVisualBounds)
-  const x = boxes.length ? Math.min(...boxes.map((b) => b.x)) - 32 : 0,
-    y = boxes.length ? Math.min(...boxes.map((b) => b.y)) - 32 : 0
-  const w = boxes.length
-      ? Math.max(64, Math.max(...boxes.map((b) => b.x + b.w)) - x + 32)
-      : 800,
-    h = boxes.length
-      ? Math.max(64, Math.max(...boxes.map((b) => b.y + b.h)) - y + 32)
-      : 600
-  const palette = paletteOf(document.look.theme)
-  const colors: Record<string, string> = {
-    "--sq-ink": palette.ink,
-    "--sq-muted": palette.muted,
-    "--sq-faint": palette.faint,
-    "--sq-paper": palette.paper,
-    "--sq-shade": palette.shade,
-    "--sq-shade-strong": palette.shadeStrong,
+  // The marks come from the same builder the editor's export uses, so a PNG an
+  // agent looks at and a PNG a person saves are the same picture. The measurer
+  // is what makes the line breaks here agree with measure_text.
+  const drawn = drawNodes(nodes, document.look, {
+    measureText: textMeasurer(document.look.font),
+    pad: PAD,
+  })
+  // an empty canvas still renders, as a blank sheet at a plausible size
+  const { body, x, y, w, h, paper } = drawn ?? {
+    body: "",
+    x: 0,
+    y: 0,
+    w: 800,
+    h: 600,
+    paper: bgOf(paletteOf(document.look.theme), document.look.paper),
   }
-  const color = (v: string) =>
-    v.replace(/var\((--[a-z-]+)\)/g, (_, key) => colors[key] ?? palette.ink)
-  const family =
-    document.look.font === "serif"
-      ? '"Source Serif 4", Georgia, serif'
-      : document.look.font === "hand"
-        ? '"Patrick Hand", "Comic Sans MS", cursive'
-        : "Geist, Arial, sans-serif"
-  const measure = textMeasurer(document.look.font)
-  const body = nodes
-    .map((node) => {
-      const { paths, texts, crisp } = primsToPaths(
-        nodePrims(node, measure),
-        node.seed,
-      )
-      let content = paths
-        .map(
-          (p) =>
-            `<path d="${escape(p.d)}" stroke="${escape(color(p.stroke))}" stroke-width="${p.strokeWidth}" fill="${escape(color(p.fill))}"${p.dash ? ` stroke-dasharray="${p.dash}"` : ""} stroke-linecap="round" stroke-linejoin="round"/>`,
-        )
-        .join("")
-      content += crisp
-        .map(
-          (c) =>
-            `<g transform="${escape(c.transform)}">${c.d.map((d) => `<path d="${escape(d)}" fill="${c.mode === "fill" ? color(c.color) : "none"}" stroke="${c.mode === "stroke" ? color(c.color) : "none"}" stroke-width="${c.strokeWidth}"/>`).join("")}</g>`,
-        )
-        .join("")
-      content += texts
-        .map(
-          (t) =>
-            `<text x="${t.x}" y="${t.y}" font-size="${t.size}" font-family="${escape(family)}" font-weight="${t.bold ? 700 : 400}" font-style="${t.italic ? "italic" : "normal"}" text-decoration="${t.underline ? "underline" : "none"}" fill="${color(INK[t.color ?? "ink"])}" text-anchor="${t.align === "center" ? "middle" : t.align === "right" ? "end" : "start"}"${mirrorGlyphs(t) ? ` transform="${mirrorGlyphs(t)}"` : ""}>${escape(t.text)}</text>`,
-        )
-        .join("")
-      if (node.type === "image") {
-        const crop = cropOf(node),
-          imageW = node.w / crop.w,
-          imageH = node.h / crop.h
-        content =
-          `<svg width="${node.w}" height="${node.h}" overflow="hidden"><g transform="translate(${node.flipX ? node.w : 0} ${node.flipY ? node.h : 0}) scale(${node.flipX ? -1 : 1} ${node.flipY ? -1 : 1})"><image href="${escape(node.src)}" x="${-crop.x * imageW}" y="${-crop.y * imageH}" width="${imageW}" height="${imageH}" preserveAspectRatio="none"/></g></svg>` +
-          content
-      }
-      return `<g transform="translate(${node.x} ${node.y})">${content}</g>`
-    })
-    .join("")
   const scale = Math.min(1, 2400 / w, 2400 / h)
   return {
-    svg: `<svg xmlns="http://www.w3.org/2000/svg" width="${Math.max(1, Math.round(w * scale))}" height="${Math.max(1, Math.round(h * scale))}" viewBox="${x} ${y} ${w} ${h}"><title>${escape(variation?.title ?? document.fileName)}</title><rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${bgOf(palette, document.look.paper)}"/>${body}</svg>`,
+    svg: `<svg xmlns="http://www.w3.org/2000/svg" width="${Math.max(1, Math.round(w * scale))}" height="${Math.max(1, Math.round(h * scale))}" viewBox="${x} ${y} ${w} ${h}"><title>${esc(variation?.title ?? document.fileName)}</title><rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${paper}"/>${body}</svg>`,
     bounds: { x, y, w, h },
   }
 }

@@ -133,6 +133,17 @@ export const FONT_FAMILY: Record<FontMode, string> = {
   serif: "var(--font-serif)",
 }
 
+/**
+ * The same three faces by name, for markup that leaves the page — an SVG
+ * rendered from node has no next/font variables to resolve. The families match
+ * what app/layout.tsx loads; the fallbacks are what a viewer without them draws.
+ */
+export const FONT_STACK: Record<FontMode, string> = {
+  hand: "'Patrick Hand', 'Comic Sans MS', cursive",
+  sans: "Geist, system-ui, sans-serif",
+  serif: "'Source Serif 4', Georgia, serif",
+}
+
 // ---------------------------------------------------------------------------
 // Paper.
 //
@@ -178,7 +189,7 @@ export function bgOf(p: Palette, shade: PaperShade): string {
 }
 
 /** The dot grid, kept readable against whatever the sheet just became. */
-export function gridOf(p: Palette, shade: PaperShade): string {
+function gridOf(p: Palette, shade: PaperShade): string {
   return shade === "shaded" ? mix(p.grid, p.ink, 0.15) : p.grid
 }
 
@@ -227,4 +238,37 @@ export function applyLook({ theme, font, paper }: Look) {
   root.style.setProperty("--sq-grid", gridOf(p, paper))
   root.style.setProperty("--sq-select", p.select)
   root.style.setProperty("--sq-font", FONT_FAMILY[font] ?? FONT_FAMILY.hand)
+}
+
+// -- a look from somewhere else ----------------------------------------------
+
+/** A palette that has since been renamed or retired must not take the app down. */
+function knownTheme(t: unknown): ThemeName {
+  return typeof t === "string" && t in THEMES ? (t as ThemeName) : DEFAULT_THEME
+}
+
+function knownFont(f: unknown): FontMode {
+  // "clean" was the old name for the one non-hand face, back when there was one
+  if (f === "clean") return "sans"
+  return f === "hand" || f === "sans" || f === "serif" ? f : DEFAULT_FONT
+}
+
+function knownPaper(s: unknown): PaperShade {
+  return s === "white" || s === "subtle" || s === "shaded" ? s : DEFAULT_PAPER
+}
+
+/**
+ * A look from storage, with every field vouched for. A field that is missing or
+ * no longer valid — a palette we retired, a font mode we renamed — comes from
+ * `fallback` rather than taking the canvas down with it.
+ */
+export function knownLook(v: unknown, fallback: Look): Look {
+  const l = (v ?? {}) as Partial<Look>
+  return {
+    theme: l.theme === undefined ? fallback.theme : knownTheme(l.theme),
+    paper: l.paper === undefined ? fallback.paper : knownPaper(l.paper),
+    font: l.font === undefined ? fallback.font : knownFont(l.font),
+    // the grid is on unless someone turned it off
+    grid: typeof l.grid === "boolean" ? l.grid : fallback.grid,
+  }
 }

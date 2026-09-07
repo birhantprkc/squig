@@ -23,14 +23,7 @@ import {
 } from "../lib/canvas/navigate.ts"
 import { searchNodes } from "../lib/canvas/find.ts"
 import type { Box, ComponentNode, ShapeNode, SquigNode, TextNode, Viewport } from "../lib/types.ts"
-
-let passed = 0
-const failures: string[] = []
-
-function check(name: string, cond: boolean, detail = "") {
-  if (cond) passed++
-  else failures.push(`${name}${detail ? ` — ${detail}` : ""}`)
-}
+import { check, report } from "./harness.ts"
 
 const close = (a: number, b: number, eps = 1e-6) => Math.abs(a - b) <= eps
 
@@ -258,9 +251,4 @@ function doc(list: SquigNode[]): [Record<string, SquigNode>, string[]] {
 
 // ---------------------------------------------------------------------------
 
-if (failures.length) {
-  console.error(`\n✗ ${failures.length} failed, ${passed} passed\n`)
-  for (const f of failures) console.error("  ✗ " + f)
-  process.exit(1)
-}
-console.log(`✓ ${passed} navigate checks passed`)
+report("navigate checks passed")

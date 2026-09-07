@@ -5,14 +5,7 @@
 // ---------------------------------------------------------------------------
 
 import { copiedSurface, svgDocument, type ExportDrawing } from "../lib/export-image-document.ts"
-
-let passed = 0
-const failures: string[] = []
-
-function check(name: string, condition: boolean, detail = "") {
-  if (condition) passed++
-  else failures.push(`${name}${detail ? ` — ${detail}` : ""}`)
-}
+import { check, report } from "./harness.ts"
 
 const drawing: ExportDrawing = {
   body: '<path id="selected-mark" d="M0 0L10 10"/>',
@@ -37,10 +30,4 @@ const paper = svgDocument(drawing, 44, 64, copiedSurface(true))
 check("a whole-canvas export paints the document paper", paper.includes('<rect x="-12" y="8" width="44" height="64" fill="#fbfaf5"/>'))
 check("saved exports default to paper", svgDocument(drawing, 44, 64) === paper)
 
-if (failures.length) {
-  console.error(`\n✗ ${failures.length} failed, ${passed} passed\n`)
-  for (const failure of failures) console.error("  ✗ " + failure)
-  process.exit(1)
-}
-
-console.log(`✓ ${passed} image export checks passed`)
+report("image export checks passed")

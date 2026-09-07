@@ -57,7 +57,7 @@ export function bindOf(n: ArrowNode): ArrowBind {
 }
 
 /** An arrow's explicit anchors, with the old-document case spelled out. */
-export function anchorsOf(n: ArrowNode): ArrowAnchors {
+function anchorsOf(n: ArrowNode): ArrowAnchors {
   return n.anchors ?? NO_ANCHORS
 }
 
@@ -137,7 +137,7 @@ export function anchorPair(a: ArrowAnchor | null, b: ArrowAnchor | null): ArrowA
 }
 
 /** Set one end's anchor, leaving the other alone. */
-export function withAnchor(
+function withAnchor(
   anchors: ArrowAnchors,
   end: 0 | 1,
   anchor: ArrowAnchor | null
@@ -381,7 +381,7 @@ export function remapBinds(clones: readonly SquigNode[], idMap: ReadonlyMap<stri
 // -- aiming at a box --------------------------------------------------------
 
 /** Screen-space reach beyond an object's outline for connector detection. */
-export const ANCHOR_CAPTURE_PX = 18
+const ANCHOR_CAPTURE_PX = 18
 
 const ANCHOR_CHOICES = ["top", "right", "bottom", "left", "center"] as const
 const SIDE_ANCHORS = ["top", "right", "bottom", "left"] as const
@@ -402,7 +402,7 @@ function nearNode(n: SquigNode, x: number, y: number, zoom: number): boolean {
 }
 
 /** The closest of the four side midpoints and center. */
-export function closestAnchor(n: SquigNode, x: number, y: number): ArrowAnchor {
+function closestAnchor(n: SquigNode, x: number, y: number): ArrowAnchor {
   let best: ArrowAnchor = "center"
   let distance = Infinity
   for (const anchor of ANCHOR_CHOICES) {

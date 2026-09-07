@@ -110,26 +110,10 @@ function DropdownMenuSubContent({
   )
 }
 
-function DropdownMenuGroup(props: React.ComponentProps<typeof Menu.Group>) {
-  return <Menu.Group data-slot="dropdown-menu-group" {...props} />
-}
-
-function DropdownMenuLabel({ className, ...props }: React.ComponentProps<typeof Menu.GroupLabel>) {
-  return (
-    <Menu.GroupLabel
-      data-slot="dropdown-menu-label"
-      className={cn("px-2.5 py-1.5 text-label text-muted-foreground", className)}
-      {...props}
-    />
-  )
-}
-
 export {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuGroup,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuShortcut,
   DropdownMenuSub,

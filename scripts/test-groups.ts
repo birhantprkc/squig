@@ -21,14 +21,7 @@ const held = new Map<string, string>()
 const { useSquig } = await import("../lib/store.ts")
 const { canGroupSelection, groupPickForHit, stepIntoGroup } = await import("../lib/canvas/groups.ts")
 import type { SquigNode } from "../lib/types.ts"
-
-let passed = 0
-const failures: string[] = []
-
-function check(name: string, condition: boolean, detail = "") {
-  if (condition) passed++
-  else failures.push(`${name}${detail ? ` — ${detail}` : ""}`)
-}
+import { check, report } from "./harness.ts"
 
 const s = () => useSquig.getState()
 
@@ -210,9 +203,4 @@ for (const [label, duplicate] of [
 
 // ---------------------------------------------------------------------------
 
-if (failures.length) {
-  console.error(`\n✗ ${failures.length} failed, ${passed} passed\n`)
-  for (const failure of failures) console.error("  ✗ " + failure)
-  process.exit(1)
-}
-console.log(`✓ ${passed} group checks passed`)
+report("group checks passed")

@@ -4,7 +4,6 @@
 // ---------------------------------------------------------------------------
 
 import type { Prim } from "@/lib/sketch/kit"
-import { place } from "@/lib/sketch/kit"
 import { BASIC_DEFS } from "./defs-basic"
 import { DISPLAY_DEFS } from "./defs-display"
 import { NAV_DEFS } from "./defs-nav"
@@ -92,11 +91,6 @@ export function renderComponent(kind: string, props: Props, w: number, h: number
   return def.render({ ...def.defaults, ...props }, w, h)
 }
 
-/** Compose a child component into a parent render at an offset — templates use this. */
-export function sub(def: ComponentDef, props: Props, x: number, y: number, w: number, h: number): Prim[] {
-  return place(def.render({ ...def.defaults, ...props }, w, h), x, y)
-}
-
 export function matches(d: ComponentDef, q: string): boolean {
   if (!q) return true
   return (
@@ -112,7 +106,7 @@ export function searchDefs(category: Category, query: string): ComponentDef[] {
   return ALL_DEFS.filter((d) => d.category === category && matches(d, q))
 }
 
-/** Search everything, for the command palette. */
+/** Search everything — the agent workspace's catalog uses this. */
 export function searchAll(query: string): ComponentDef[] {
   const q = query.trim().toLowerCase()
   return ALL_DEFS.filter((d) => matches(d, q))

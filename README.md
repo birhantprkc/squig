@@ -84,9 +84,10 @@ pnpm dev
 
 The local canvas needs no environment variables, database, or accounts — those
 documents live in browser storage. The optional agent workspace server uses
-Postgres; see Squig for agents below. `pnpm test` type-checks and runs the geometry,
-selection and clipboard suites; `pnpm lint` and `pnpm build` are the other two
-worth running before you push.
+Postgres; see Squig for agents below. `pnpm test` type-checks and runs every
+suite under `scripts/test-*.ts`, and `pnpm test crop text` runs just the ones
+whose names match. `pnpm verify` is lint, test and build in one go — the thing
+to run before you push.
 
 ## How it's put together
 
@@ -108,14 +109,25 @@ To add a component, write a `ComponentDef` and add it to an array. See
 [`lib/library/AUTHORING.md`](lib/library/AUTHORING.md).
 
 ```
-app/                     the single page
+app/                     the single page (and /kitchen-sink)
+app/mcp/route.ts         the hosted MCP at squig.sh/mcp
+app/api/v1/              the same commands over REST
 components/canvas/       canvas, interactions, rough.js renderer
 components/chrome/       rail, panels, inspector, ⌘K, menus
+components/agent/        connect an agent to this canvas, and stay in sync
+lib/doc.ts               the document as a value: read, build, change, write
+lib/store.ts             zustand doc state + history
+lib/files.ts             the local file drawer: autosave, recents, prefs
+lib/agent-bridge.ts      window.squig, the same API from the console
+lib/agent/               the hosted workspace: schema, engine, service, db, render
 lib/sketch/              drawing primitives + Phosphor icons
+lib/sketch/paths.ts      primitives to rough.js paths
+lib/sketch/svg.ts        a drawing as SVG, with no DOM in the room
 lib/library/             every component and block definition
 lib/canvas/snap-engine   alignment/snapping math
-lib/store.ts             zustand doc state + history
-lib/files.ts             the local file drawer — autosave, recents, prefs
+scripts/squig.ts         the CLI
+scripts/test.ts          the test runner, over scripts/test-*.ts
+scripts/harness.ts       the four lines of test framework there are
 ```
 
 ## Stack
@@ -187,3 +199,9 @@ codex plugin add squig@squig-plugins
 Set `SQUIG_API_KEY` privately in your agent's environment and start a new task.
 No production code is generated or deployed by Squig's tools. Your coding
 agent handles implementation after the human chooses a direction.
+
+Without a workspace, the same file still has two doors: `pnpm squig` writes
+a `.squig.json` from a terminal, and `window.squig` drives an open canvas from
+the console. [docs/agents.md](docs/agents.md) covers both, and
+[docs/format.md](docs/format.md) is the file format for anyone writing one by
+hand.

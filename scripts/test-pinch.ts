@@ -12,14 +12,7 @@
 
 import { pinchViewport, type Pt, type ZoomRange } from "../lib/canvas/pinch.ts"
 import { screenToWorld, type Viewport } from "../lib/types.ts"
-
-let passed = 0
-const failures: string[] = []
-
-function check(name: string, cond: boolean, detail = "") {
-  if (cond) passed++
-  else failures.push(`${name}${detail ? ` — ${detail}` : ""}`)
-}
+import { check, report } from "./harness.ts"
 
 const close = (a: number, b: number, eps = 1e-6) => Math.abs(a - b) <= eps
 
@@ -147,9 +140,4 @@ const IDENTITY: Viewport = { x: 0, y: 0, zoom: 1 }
 
 // ---------------------------------------------------------------------------
 
-if (failures.length) {
-  console.error(`\n✗ ${failures.length} failed, ${passed} passed\n`)
-  for (const f of failures) console.error("  ✗ " + f)
-  process.exit(1)
-}
-console.log(`✓ ${passed} pinch checks passed`)
+report("pinch checks passed")

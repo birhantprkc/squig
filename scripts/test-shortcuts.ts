@@ -13,13 +13,7 @@ import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { SHORTCUT_GROUPS, kbd } from "../lib/shortcuts.ts"
 import { DEFAULT_BIG_NUDGE, MAX_BIG_NUDGE, normalizeBigNudge } from "../lib/nudge.ts"
-
-let passed = 0
-const failures: string[] = []
-const check = (name: string, cond: boolean, detail = "") => {
-  if (cond) passed++
-  else failures.push(`${name}${detail ? ` — ${detail}` : ""}`)
-}
+import { check, report } from "./harness.ts"
 
 /** kbd() asks navigator which machine it's on, so the test answers for it. */
 const asPlatform = (ua: string) =>
@@ -125,9 +119,4 @@ for (const [claim, token] of CLAIMS) {
 
 // ---------------------------------------------------------------------------
 
-if (failures.length) {
-  console.error(`\n✗ ${failures.length} failed, ${passed} passed\n`)
-  for (const f of failures) console.error("  ✗ " + f)
-  process.exit(1)
-}
-console.log(`✓ ${passed} shortcut checks passed`)
+report("shortcut checks passed")

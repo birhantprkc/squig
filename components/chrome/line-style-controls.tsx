@@ -41,7 +41,7 @@ const OPTIONS: readonly SegmentOption<LineStyle>[] = STYLES.map(({ value, label 
   content: <RouteGlyph style={value} />,
 }))
 
-export function sharedLineStyle(arrows: readonly ArrowNode[]): Shared<LineStyle> {
+function sharedLineStyle(arrows: readonly ArrowNode[]): Shared<LineStyle> {
   return shared(arrows.map(lineStyleOf))
 }
 

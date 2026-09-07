@@ -290,7 +290,7 @@ export interface ImageCrop {
 }
 
 /** The whole picture — what a node with no `crop` is showing. */
-export const FULL_CROP: ImageCrop = { x: 0, y: 0, w: 1, h: 1 }
+const FULL_CROP: ImageCrop = { x: 0, y: 0, w: 1, h: 1 }
 
 /** Smallest slice of a picture a crop may narrow to, per axis. */
 const MIN_CROP = 0.005
@@ -336,17 +336,8 @@ export interface SquigDoc {
   order: string[]
 }
 
-export function worldToScreen(v: Viewport, wx: number, wy: number): [number, number] {
-  return [wx * v.zoom + v.x, wy * v.zoom + v.y]
-}
-
 export function screenToWorld(v: Viewport, sx: number, sy: number): [number, number] {
   return [(sx - v.x) / v.zoom, (sy - v.y) / v.zoom]
-}
-
-/** The group a click should select — the outermost one the node belongs to. */
-export function outerGroup(n: SquigNode | undefined | null): string | null {
-  return n?.groupIds?.[0] ?? null
 }
 
 export interface Box {

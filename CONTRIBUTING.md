@@ -17,12 +17,13 @@ documents live in the browser's own storage.
 Before you push:
 
 ```bash
-pnpm lint
-pnpm test     # type-checks, then runs the geometry, selection and clipboard suites
-pnpm build
+pnpm verify   # lint, then test, then build
 ```
 
-All three should be green before you open a pull request.
+`pnpm test` on its own type-checks and runs every suite under
+`scripts/test-*.ts`; pass names to narrow it while you work, as in
+`pnpm test crop text`. All three steps should be green before you open a pull
+request.
 
 ## The easiest thing to contribute
 
@@ -49,12 +50,16 @@ not a mockup tool. Features that push toward pixel-precision — gradients,
 shadows, exact color pickers — are usually the wrong direction, because the
 whole point is that nothing looks decided yet.
 
-**It doesn't add a backend.** No accounts, no sync, no cloud. Files stay in
-the browser.
+**It keeps the canvas backend-free.** No accounts, no sync, no cloud, and your
+files stay in the browser. The optional agent workspace is the one server-side
+piece squig has, and it stays optional: the canvas itself works with no
+database at all.
 
 ## Style
 
-Match the file you're in. A few conventions worth knowing:
+Match the file you're in. [AGENTS.md](AGENTS.md) is the short version of how
+this repo works — the map, the gate, and where the big files come apart. A few
+conventions worth knowing:
 
 - Comments explain *why*, not what. Most of the codebase's comments are there
   because a decision would look arbitrary otherwise — keep that bar.

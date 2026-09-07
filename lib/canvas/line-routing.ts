@@ -12,9 +12,9 @@ import { normalizeLineStyle } from "../types"
 import { mirrorPoint } from "./transform"
 
 export type LinePoint = [number, number]
-export type RouteAxis = "x" | "y"
+type RouteAxis = "x" | "y"
 
-export interface ElbowHandle {
+interface ElbowHandle {
   kind: "elbow"
   /** coordinate the drag changes; x means a vertical segment */
   axis: RouteAxis
@@ -25,7 +25,7 @@ export interface ElbowHandle {
   offset: LinePoint
 }
 
-export interface CurveHandle {
+interface CurveHandle {
   kind: "curved"
   point: LinePoint
   offset: LinePoint
@@ -53,7 +53,7 @@ const anchorAxis = (a: ArrowAnchor | null | undefined): RouteAxis | null => {
 }
 
 /** The automatic H-V-H / V-H-V choice before a person takes hold of it. */
-export function automaticElbowAxis(n: ArrowNode): RouteAxis {
+function automaticElbowAxis(n: ArrowNode): RouteAxis {
   if (n.elbowAxis === "x" || n.elbowAxis === "y") return n.elbowAxis
   const a = anchorAxis(n.anchors?.[0])
   const b = anchorAxis(n.anchors?.[1])

@@ -24,14 +24,7 @@ import { textBaseline, textBlockHeight, textBoxPadding, textContentWidth } from 
 import { nodePrims } from "../lib/sketch/node-prims.ts"
 import { scaleNodes } from "../lib/canvas/transform.ts"
 import { unionBox, type TextNode } from "../lib/types.ts"
-
-let passed = 0
-const failures: string[] = []
-
-function check(name: string, cond: boolean, detail = "") {
-  if (cond) passed++
-  else failures.push(`${name}${detail ? ` — ${detail}` : ""}`)
-}
+import { check, report } from "./harness.ts"
 
 function close(a: number, b: number, eps = 1e-6) {
   return Math.abs(a - b) <= eps
@@ -285,9 +278,4 @@ check("unionBox sanity", unionBox([text({})])!.maxX === 100)
 
 // -- report -----------------------------------------------------------------
 
-if (failures.length) {
-  console.error(`✗ ${failures.length} failed, ${passed} passed`)
-  for (const f of failures) console.error(`  ✗ ${f}`)
-  process.exit(1)
-}
-console.log(`✓ text: all ${passed} checks passed`)
+report("text checks passed")

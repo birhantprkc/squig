@@ -35,14 +35,7 @@ const held = new Map<string, string>()
 const { useSquig } = await import("../lib/store.ts")
 const { hitsPoint } = await import("../lib/canvas/hit-test.ts")
 import type { SquigNode, TextNode } from "../lib/types.ts"
-
-let passed = 0
-const failures: string[] = []
-
-function check(name: string, cond: boolean, detail = "") {
-  if (cond) passed++
-  else failures.push(`${name}${detail ? ` — ${detail}` : ""}`)
-}
+import { check, report } from "./harness.ts"
 
 // -- the canvas, driven the way the app drives it ---------------------------
 
@@ -419,9 +412,4 @@ function docJson(): string {
 
 // ---------------------------------------------------------------------------
 
-if (failures.length) {
-  console.error(`\n✗ ${failures.length} failed, ${passed} passed\n`)
-  for (const f of failures) console.error("  ✗ " + f)
-  process.exit(1)
-}
-console.log(`✓ ${passed} undo checks passed`)
+report("undo checks passed")

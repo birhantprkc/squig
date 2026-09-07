@@ -18,7 +18,7 @@
 import type { SquigNode } from "./types"
 import { canWrite } from "./tabs"
 import { DEFAULT_BIG_NUDGE, normalizeBigNudge } from "./nudge"
-import { DEFAULT_FONT, DEFAULT_LOOK, DEFAULT_PAPER, DEFAULT_THEME, THEMES, type FontMode, type Look, type PaperShade, type ThemeName } from "./theme"
+import { DEFAULT_LOOK, knownLook, type FontMode, type Look, type ThemeName } from "./theme"
 
 export interface FileMeta {
   id: string
@@ -209,37 +209,6 @@ export function deleteFile(id: string): FileMeta[] {
   const index = listFiles().filter((f) => f.id !== id)
   writeIndex(index)
   return index
-}
-
-/** A palette that has since been renamed or retired must not take the app down. */
-function knownTheme(t: unknown): ThemeName {
-  return typeof t === "string" && t in THEMES ? (t as ThemeName) : DEFAULT_THEME
-}
-
-function knownFont(f: unknown): FontMode {
-  // "clean" was the old name for the one non-hand face, back when there was one
-  if (f === "clean") return "sans"
-  return f === "hand" || f === "sans" || f === "serif" ? f : DEFAULT_FONT
-}
-
-function knownPaper(s: unknown): PaperShade {
-  return s === "white" || s === "subtle" || s === "shaded" ? s : DEFAULT_PAPER
-}
-
-/**
- * A look from storage, with every field vouched for. A field that is missing or
- * no longer valid — a palette we retired, a font mode we renamed — comes from
- * `fallback` rather than taking the canvas down with it.
- */
-export function knownLook(v: unknown, fallback: Look): Look {
-  const l = (v ?? {}) as Partial<Look>
-  return {
-    theme: l.theme === undefined ? fallback.theme : knownTheme(l.theme),
-    paper: l.paper === undefined ? fallback.paper : knownPaper(l.paper),
-    font: l.font === undefined ? fallback.font : knownFont(l.font),
-    // the grid is on unless someone turned it off
-    grid: typeof l.grid === "boolean" ? l.grid : fallback.grid,
-  }
 }
 
 export function loadPrefs(): Prefs {

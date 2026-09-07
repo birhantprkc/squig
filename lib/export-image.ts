@@ -211,7 +211,7 @@ async function draw(list: SquigNode[]): Promise<ExportDrawing> {
 
   const s = useSquig.getState()
   const font = canvasFontStack()
-  const d = drawNodes(list, { theme: s.theme, paper: s.paper, font: s.font, grid: s.grid }, font)
+  const d = drawNodes(list, { theme: s.theme, paper: s.paper, font: s.font, grid: s.grid }, { font })
   if (!d) throw new Error("nothing to draw")
   return { ...d, css: await fontFaceCss(font) }
 }

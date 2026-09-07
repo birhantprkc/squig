@@ -110,19 +110,22 @@ To add a component, write a `ComponentDef` and add it to an array. See
 
 ```
 app/                     the single page (and /kitchen-sink)
+app/mcp/route.ts         the hosted MCP at squig.sh/mcp
+app/api/v1/              the same commands over REST
 components/canvas/       canvas, interactions, rough.js renderer
 components/chrome/       rail, panels, inspector, ⌘K, menus
+components/agent/        connect an agent to this canvas, and stay in sync
 lib/doc.ts               the document as a value: read, build, change, write
 lib/store.ts             zustand doc state + history
 lib/files.ts             the local file drawer: autosave, recents, prefs
 lib/agent-bridge.ts      window.squig, the same API from the console
+lib/agent/               the hosted workspace: schema, engine, service, db, render
 lib/sketch/              drawing primitives + Phosphor icons
 lib/sketch/paths.ts      primitives to rough.js paths
 lib/sketch/svg.ts        a drawing as SVG, with no DOM in the room
 lib/library/             every component and block definition
 lib/canvas/snap-engine   alignment/snapping math
 scripts/squig.ts         the CLI
-scripts/mcp.ts           the MCP server
 scripts/test.ts          the test runner, over scripts/test-*.ts
 scripts/harness.ts       the four lines of test framework there are
 ```

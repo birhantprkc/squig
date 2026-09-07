@@ -6,8 +6,8 @@ a hand-drawn sketch. A document is a flat map of nodes saved as
 
 There are three doors. Use the first one that fits.
 
-1. **The file door.** You have a shell or an MCP client and you want a
-   `.squig.json` on disk that a person can open. This is almost always the one.
+1. **The file door.** You have a shell and you want a `.squig.json` on disk
+   that a person can open. This is almost always the one.
 2. **The browser door.** The app is already open and you are driving the canvas
    somebody is looking at.
 3. **The library door.** You are writing TypeScript in this repo.
@@ -61,51 +61,22 @@ pnpm squig validate signin.squig.json
 Every mutating command prints the ids it touched. Anything you got wrong prints
 one sentence on stderr and exits 1.
 
-### The MCP server
+### The hosted MCP
 
-Same document API, over stdio, for a client that speaks MCP.
+A canvas can also live on squig.sh instead of on your disk, and then a person
+watches it fill in while you draw. squig.sh serves an MCP over Streamable HTTP
+at `https://squig.sh/mcp`, where every tool is prefixed `squig_`; an agent
+without an MCP client runs the same commands over plain HTTP at
+`POST /api/v1/tools/{name}`.
 
-Claude Code:
-
-```bash
-claude mcp add squig -- pnpm --dir /absolute/path/to/squig mcp
-```
-
-Cursor, Codex and anything else that reads an `mcp.json`:
-
-```json
-{
-  "mcpServers": {
-    "squig": {
-      "command": "pnpm",
-      "args": ["--dir", "/absolute/path/to/squig", "mcp"]
-    }
-  }
-}
-```
-
-Documents are addressed by absolute path, and a path that does not end in
-`.squig.json` is refused.
-
-| tool | what it does |
-|---|---|
-| `list_components({ query? })` | the library index: kind, name, group, default size |
-| `describe_component({ kind })` | one component's default size, props and legal values |
-| `create_document({ path, name? })` | a blank document, refusing to overwrite |
-| `read_document({ path })` | name, look, bounds, and every node in draw order |
-| `add_nodes({ path, nodes })` | components, text, shapes and arrows in one write |
-| `update_node({ path, id, patch })` | merge a patch into one node |
-| `remove_nodes({ path, ids })` | take nodes off the sheet |
-| `group_nodes({ path, ids })` | group them, answering with the new group id |
-| `reorder_nodes({ path, ids, to })` | send to `"front"` or `"back"` |
-| `render_svg({ path, out?, transparent? })` | the markup, or the path it was written to |
-
-`add_nodes` takes a list tagged by `type`: `component` (`kind, x, y, w?, h?,
-props?`), `text` (`text, x, y, fontSize?, w?, align?, bold?, italic?, ink?,
-boxed?`), `shape` (`shape, x, y, w, h, fill?, dashed?`) and `arrow` (`from,
-to, head?, lineStyle?`), each with an optional `id`. An arrow end is a node id
-or an `[x, y]` point, and it may name an id created earlier in the same batch.
-One batch is one write, so send a screen as one call rather than twelve.
+Setup is one paste. In the editor, **Connect agent** then **Copy for your
+agent** hands over the canvas link, a key scoped to that canvas, and both
+addresses. The client configs are at
+[squig.sh/docs/mcp](https://squig.sh/docs/mcp), the machine-readable schema at
+[/openapi.json](https://squig.sh/openapi.json), and the whole workflow at
+[/llms-full.txt](https://squig.sh/llms-full.txt). Running your own needs a
+Postgres `DATABASE_URL`; [agent-architecture.md](agent-architecture.md) has
+the shape of it.
 
 ---
 

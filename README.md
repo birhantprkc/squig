@@ -108,15 +108,34 @@ To add a component, write a `ComponentDef` and add it to an array. See
 [`lib/library/AUTHORING.md`](lib/library/AUTHORING.md).
 
 ```
-app/                     the single page
+app/                     the single page (and /kitchen-sink)
 components/canvas/       canvas, interactions, rough.js renderer
 components/chrome/       rail, panels, inspector, ⌘K, menus
+lib/doc.ts               the document as a value: read, build, change, write
+lib/store.ts             zustand doc state + history
+lib/files.ts             the local file drawer: autosave, recents, prefs
+lib/agent-bridge.ts      window.squig, the same API from the console
 lib/sketch/              drawing primitives + Phosphor icons
+lib/sketch/paths.ts      primitives to rough.js paths
+lib/sketch/svg.ts        a drawing as SVG, with no DOM in the room
 lib/library/             every component and block definition
 lib/canvas/snap-engine   alignment/snapping math
-lib/store.ts             zustand doc state + history
-lib/files.ts             the local file drawer — autosave, recents, prefs
+scripts/squig.ts         the CLI
+scripts/mcp.ts           the MCP server
+scripts/test.ts          the test runner, over scripts/test-*.ts
+scripts/harness.ts       the four lines of test framework there are
 ```
+
+## squig for agents
+
+An agent can draw too, through the same document a person draws. There are
+three doors: a CLI (`pnpm squig add page.squig.json button --x 0 --y 0`), an
+MCP server (`pnpm mcp`) for a client that speaks it, and `window.squig` in the
+console when the app is already open. All three write the same `.squig.json`,
+and all three go through `lib/doc.ts`, so a drawing that is legal at one door
+is legal at every other. [docs/agents.md](docs/agents.md) is the reference for
+driving squig, and [docs/format.md](docs/format.md) is the file format for
+anyone writing one by hand.
 
 ## Stack
 

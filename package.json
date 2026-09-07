@@ -8,6 +8,8 @@
     "build": "next build",
     "build:xdc": "make build-xdc",
     "start": "next start",
+    "squig": "node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/register-loader.mjs scripts/squig.ts",
+    "mcp": "node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/register-loader.mjs scripts/mcp.ts",
     "lint": "eslint",
     "typecheck": "tsc --noEmit && tsc --noEmit -p scripts/tsconfig.json",
     "test": "pnpm typecheck && node --experimental-strip-types --import ./scripts/register-loader.mjs scripts/test.ts",
@@ -32,6 +34,7 @@
     "zustand": "^5.0.14"
   },
   "devDependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
@@ -39,6 +42,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.12",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "zod": "^4.5.4"
   }
 }

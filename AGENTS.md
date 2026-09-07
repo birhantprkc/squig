@@ -1,0 +1,103 @@
+# Working on squig
+
+squig is a wireframing tool: an infinite canvas where you drag in real UI
+components and everything renders as a hand-drawn sketch through
+[rough.js](https://roughjs.com). A document is a flat map of nodes saved as
+`.squig.json`, kept in the browser's own storage; there is no backend, no
+accounts and no sync. This file is for changing the codebase. To *drive* squig
+from a CLI, an MCP client or the console, read [docs/agents.md](docs/agents.md),
+and for the file format itself [docs/format.md](docs/format.md).
+
+## The map
+
+```
+app/                     the single page (and /kitchen-sink)
+components/canvas/       canvas, interactions, rough.js renderer
+components/chrome/       rail, panels, inspector, ⌘K, menus
+lib/doc.ts               the document as a value: read, build, change, write
+lib/store.ts             zustand doc state + history
+lib/files.ts             the local file drawer: autosave, recents, prefs
+lib/agent-bridge.ts      window.squig, the same API from the console
+lib/sketch/              drawing primitives + Phosphor icons
+lib/sketch/paths.ts      primitives to rough.js paths
+lib/sketch/svg.ts        a drawing as SVG, with no DOM in the room
+lib/library/             every component and block definition
+lib/canvas/snap-engine   alignment/snapping math
+scripts/squig.ts         the CLI
+scripts/mcp.ts           the MCP server
+scripts/test.ts          the test runner, over scripts/test-*.ts
+scripts/harness.ts       the four lines of test framework there are
+```
+
+## The gate
+
+```bash
+pnpm typecheck        # the app and scripts/, both
+pnpm test             # typecheck, then every suite
+pnpm test crop text   # just the suites whose names match
+pnpm lint
+pnpm build
+pnpm verify           # lint, test, build, in that order
+```
+
+All of it green before you push. Tests are plain node scripts: no framework,
+no globals to learn, just `check(name, condition)` and `report(...)` from
+`scripts/harness.ts`, each suite run in its own process. New behaviour gets a
+case in the nearest `scripts/test-*.ts` rather than a new file, unless it is
+genuinely a new subject.
+
+## Conventions
+
+- **Comments explain why, not what.** Most comments in this codebase are there
+  because a decision would look arbitrary otherwise. Keep that bar.
+- **Components never render to DOM.** A `ComponentDef.render()` returns drawing
+  primitives, and the canvas draws them. That indirection is what makes panel
+  previews, ⌘K thumbnails and break-apart reuse the exact same marks.
+- **Geometry lives in `lib/` and is testable without React.** If you are
+  writing math, it goes in a `lib/` module with a case in a test suite, not
+  inside a component.
+- **Match Figma's keyboard.** If Figma has a shortcut for it, squig uses the
+  same one. Muscle memory is the feature.
+- **Low fidelity is the point.** Gradients, shadows, exact colour pickers and
+  anything else pushing toward pixel precision are usually the wrong direction.
+  It is a napkin for working out ideas.
+- **Monochrome.** One ink on paper, three fill tones, three ink tones. No
+  fourth.
+- **No backend, and no emoji in UI copy.**
+
+## The big files
+
+**`components/canvas/canvas.tsx`** (~2,500 lines) is the pointer state machine,
+and it is one file because splitting a state machine hides its transitions. The
+seams: the `Gesture` union at the top names every state a pointer can be in;
+`updateGesture` moves one along; `finishGesture` commits it to the store; and
+the keyboard effect near the bottom owns shortcuts. Find the gesture first,
+then change it.
+
+**`lib/store.ts`** (~2,000 lines) is document state, the undo/redo stack and
+the file drawer's calls into `lib/files.ts`. Edits go through the store so
+history and autosave stay honest.
+
+**`lib/library/defs-*.ts`** are data, not logic. They are long because there
+are a lot of components, and each one is independent of the rest.
+
+## Adding a component
+
+The easiest useful change. A library item is one `ComponentDef`: a default
+size, variant props, inspector controls, and a `render()` returning
+primitives, added to an array. [`lib/library/AUTHORING.md`](lib/library/AUTHORING.md)
+walks through the whole thing, including the drawing DSL.
+
+## Verifying UI work
+
+Types compiling is not evidence that a canvas looks right.
+
+```bash
+pnpm dev
+```
+
+Then look at it. `/kitchen-sink` renders every def at its default size and
+again squeezed, which is where a bad layout shows up without dragging a
+hundred things onto a canvas. For work that is easier to check as a file than
+by hand, `pnpm squig render some.squig.json --out some.svg` prints the same
+marks the canvas draws.

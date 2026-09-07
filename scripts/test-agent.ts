@@ -11,13 +11,7 @@
 // ---------------------------------------------------------------------------
 
 import { isDeepStrictEqual } from "node:util"
-import {
-  applyOperations,
-  cleanNode,
-  diffNodes,
-  emptyDocument,
-  validateDocument,
-} from "../lib/agent/engine.ts"
+import { applyOperations, cleanNode, diffNodes, emptyDocument, validateDocument, AgentError, type CanvasDocument } from "../lib/agent/engine.ts"
 import { renderPng, renderSvg, pngDocument } from "../lib/agent/render.ts"
 import { operation } from "../lib/agent/schema.ts"
 import { ALL_DEFS } from "../lib/library/registry.ts"
@@ -250,6 +244,34 @@ check("the copied arrow binds to the copies", (() => {
   const n = cloned.document.nodes[cloned.createdIds[2]]
   return n.type === "arrow" && same(n.bind, cloned.createdIds.slice(0, 2))
 })())
+
+// -- grouping is whatever ⌘G does -------------------------------------------
+
+const grouped = applyOperations(
+  d,
+  operation.array().parse([{ op: "group", ids: ["a", "b"] }]),
+).document
+check("both members carry the one new group", (() => {
+  const path = grouped.nodes.a.groupIds
+  return !!path && path.length === 1 && same(path, grouped.nodes.b.groupIds)
+})())
+check("and nobody else joined it", grouped.nodes.c.groupIds === undefined)
+check(
+  "grouping the same pair again has nothing to do",
+  refused(() =>
+    applyOperations(
+      grouped,
+      operation.array().parse([{ op: "group", ids: ["a", "b"] }]),
+    ),
+  ),
+)
+check(
+  "deleting one of two leaves the other ungrouped",
+  applyOperations(
+    grouped,
+    operation.array().parse([{ op: "delete", ids: ["a"] }]),
+  ).document.nodes.b.groupIds === undefined,
+)
 
 // -- arranging --------------------------------------------------------------
 
@@ -629,6 +651,62 @@ check(
   measuredCharacters < 300000,
   `${measuredCharacters} characters measured`,
 )
+const { textNode } = await import("../lib/doc.ts")
+const noteText = "Wide words wrap here and keep going for a while yet"
+const noteAt = {
+  x: 0,
+  y: 0,
+  w: 200,
+  fontSize: 18,
+  boxed: true,
+  boxFill: "light",
+} as const
+const noteDoc = emptyDocument("Notes")
+const noted = applyOperations(
+  noteDoc,
+  operation.array().parse([{ op: "note", x: 0, y: 0, w: 200, text: noteText }]),
+)
+check(
+  "a note is wrapped by the faces the render uses",
+  noted.document.nodes[noted.createdIds[0]].h ===
+    textNode(noteText, noteAt, textMeasurer(noteDoc.look.font)).h,
+)
+check(
+  "…which is not the em-ratio guess a browserless caller gets",
+  textNode(noteText, noteAt).h !==
+    textNode(noteText, noteAt, textMeasurer(noteDoc.look.font)).h,
+)
+const fixedWidth = applyOperations(
+  emptyDocument("Hug"),
+  operation.array().parse([
+    {
+      op: "add",
+      nodes: [
+        {
+          id: "t",
+          type: "text",
+          x: 0,
+          y: 0,
+          w: 60,
+          h: 40,
+          fixedW: true,
+          text: "Hug these words",
+          fontSize: 20,
+        },
+      ],
+    },
+  ]),
+).document
+const hugging = applyOperations(
+  fixedWidth,
+  operation
+    .array()
+    .parse([{ op: "update", patches: [{ id: "t", unset: ["fixedW"] }] }]),
+).document
+check("unsetting fixedW puts the box back around the words", (() => {
+  const n = hugging.nodes.t
+  return n.type === "text" && !n.fixedW && n.w > fixedWidth.nodes.t.w
+})())
 
 // -- WebP is accepted by the canvas and must survive agent PNG previews -----
 
@@ -690,5 +768,90 @@ check(
 )
 
 // ---------------------------------------------------------------------------
+
+// -- a batch is one edit: invariants hold at the end, not between steps ----
+
+{
+  const ops = (list: unknown[]) => operation.array().parse(list)
+  const status = (fn: () => unknown) => {
+    try {
+      fn()
+      return null
+    } catch (e) {
+      return e instanceof AgentError ? e.status : "threw"
+    }
+  }
+  const two = applyOperations(
+    emptyDocument("batch"),
+    ops([
+      { op: "add", nodes: [{ id: "p", type: "shape", x: 0, y: 0, w: 40, h: 40 }] },
+      {
+        op: "add",
+        nodes: [
+          { id: "link", type: "arrow", x: 0, y: 0, w: 10, h: 10, points: [[0, 0], [10, 10]], head: true, bind: ["p", "q"] },
+        ],
+      },
+      { op: "add", nodes: [{ id: "q", type: "shape", x: 200, y: 0, w: 40, h: 40 }] },
+    ]),
+  ).document
+  check("an arrow may name a box a later add brings", same(two.nodes.link.type === "arrow" && two.nodes.link.bind, ["p", "q"]))
+
+  const paired = applyOperations(
+    two,
+    ops([{ op: "update", patches: [{ id: "p", patch: { groupIds: ["g9"] } }, { id: "q", patch: { groupIds: ["g9"] } }] }]),
+  ).document
+  check("two patches can found a group between them", same(paired.nodes.p.groupIds, ["g9"]) && same(paired.nodes.q.groupIds, ["g9"]))
+
+  const labelled = applyOperations(
+    two,
+    ops([{ op: "add", nodes: [{ id: "t", type: "text", x: 0, y: 100, w: 160, h: 80, text: "Hi", fontSize: 20, align: "center" }] }]),
+  ).document
+  const lockedLabel = applyOperations(labelled, ops([{ op: "update", patches: [{ id: "t", patch: { locked: true } }] }])).document
+  check("locking a label leaves its box alone", lockedLabel.nodes.t.w === 160 && lockedLabel.nodes.t.x === 0)
+
+  const words = "Wide words wrap here and keep going for a while yet"
+  const hand = applyOperations(emptyDocument("faces"), ops([{ op: "note", x: 0, y: 0, w: 200, text: words }])).document
+  const sans = applyOperations(
+    emptyDocument("faces"),
+    ops([{ op: "look", font: "sans" }, { op: "note", x: 0, y: 0, w: 200, text: words }]),
+  ).document
+  const height = (doc: CanvasDocument) => doc.nodes[doc.order[0]].h
+  check("a note after a look change measures with the new face", height(hand) !== height(sans))
+
+  check("words that aren't a string are a 400, not a crash", status(() => applyOperations(two, ops([{ op: "update", patches: [{ id: "p", patch: { text: 123 } }] }]))) === 400)
+  check("a negative width in a patch is a 400", status(() => applyOperations(two, ops([{ op: "update", patches: [{ id: "p", patch: { w: -5 } }] }]))) === 400)
+
+  const long = "x".repeat(80)
+  check("an eighty-character id is still welcome", status(() => applyOperations(two, ops([{ op: "add", nodes: [{ id: long, type: "shape", x: 0, y: 0, w: 1, h: 1 }] }]))) === null)
+
+  const withButton = applyOperations(
+    two,
+    ops([
+      { op: "add", nodes: [{ id: "btn", type: "component", kind: "button", x: 0, y: 300 }] },
+      { op: "group", ids: ["btn", "q"], groupId: "pair" },
+    ]),
+  ).document
+  const detached = applyOperations(withButton, ops([{ op: "detach", ids: ["btn"] }])).document
+  check("detaching a grouped component keeps its sibling in the group", same(detached.nodes.q.groupIds, ["pair"]))
+
+  const rebuilt = applyOperations(
+    withButton,
+    ops([
+      { op: "delete", ids: ["q"] },
+      { op: "add", nodes: [{ id: "c", type: "shape", x: 0, y: 500, w: 1, h: 1 }, { id: "d", type: "shape", x: 0, y: 600, w: 1, h: 1 }] },
+      { op: "group", ids: ["c", "d"] },
+      { op: "add", nodes: [{ id: "q", type: "shape", x: 200, y: 0, w: 40, h: 40, groupIds: ["pair"] }] },
+    ]),
+  ).document
+  check("grouping elsewhere doesn't dissolve a group the batch is rebuilding", same(rebuilt.nodes.btn.groupIds, ["pair"]) && same(rebuilt.nodes.q.groupIds, ["pair"]))
+
+  const tall = applyOperations(
+    two,
+    ops([{ op: "add", nodes: [{ id: "para", type: "text", x: 0, y: 0, w: 80, fixedW: true, text: "two lines of words here", fontSize: 18 }] }]),
+  ).document
+  const squashed = applyOperations(tall, ops([{ op: "update", patches: [{ id: "para", patch: { h: 1 } }] }])).document
+  const needed = textNode("two lines of words here", { x: 0, y: 0, w: 80, fontSize: 18 }, textMeasurer("hand")).h
+  check("a height patch can't push the words out of the box", squashed.nodes.para.h === needed && needed > 1)
+}
 
 report(`agent engine checks passed (${ALL_DEFS.length} library definitions)`)

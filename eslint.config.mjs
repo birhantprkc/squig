@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // scratch worktrees carry their own .next/ and out/, which the patterns
+    // above only match at the root
+    ".claude/**",
   ]),
 ]);
 

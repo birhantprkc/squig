@@ -34,7 +34,8 @@ import { bindPair, settleBinds } from "./canvas/arrow-binding"
 import { nodeVisualBounds } from "./canvas/line-routing"
 import { planGroupPaths, pruneDegenerateGroups } from "./canvas/groups"
 import { fitTextBox } from "./canvas/text-reflow"
-import { ALL_DEFS, getDef, matches, type Category, type ControlDef, type Props } from "./library/registry"
+import type { TextMeasurer } from "./canvas/text-metrics"
+import { ALL_DEFS, getDef, matches, type Category, type ComponentDef, type ControlDef, type Props } from "./library/registry"
 import { DEFAULT_LOOK, knownLook, type Look } from "./theme"
 
 export const DOC_VERSION = 1
@@ -50,7 +51,12 @@ export interface SquigDocument extends SquigDoc {
 export class DocError extends Error {}
 
 /** Short and URL-safe, like the ids the app mints; a caller may bring its own. */
-const ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/
+const ID_PATTERN = /^[A-Za-z0-9_-]{1,80}$/
+/** Names a plain object already answers to — as a key they'd reach the prototype. */
+const RESERVED_IDS = new Set(["__proto__", "constructor", "prototype"])
+/** A picture is raster: an SVG data URL can carry script, and nothing here needs one. */
+const RASTER_SRC = /^data:image\/(png|jpeg|webp|gif);base64,/i
+const MAX_FONT_SIZE = 1000
 /** Keeps a typo'd coordinate from putting a node a light-year off the sheet. */
 const MAX_COORD = 1_000_000
 
@@ -214,6 +220,7 @@ export interface TextAt extends NodeAt {
   underline?: boolean
   ink?: InkTone
   boxed?: boolean
+  boxFill?: FillTone
   link?: string
 }
 
@@ -222,9 +229,11 @@ export interface TextAt extends NodeAt {
  *
  * `x` is where the anchor edge lands — the left edge for left-aligned text,
  * the middle for centred, the right edge for right-aligned — and `y` is the
- * top of the box. Give it a `w` and the words wrap to it instead.
+ * top of the box. Give it a `w` and the words wrap to it instead. Off the
+ * browser, `measureText` (see lib/canvas/text-metrics) is what makes the
+ * box the size the real face needs rather than an em-ratio guess.
  */
-export function textNode(text: string, at: TextAt): TextNode {
+export function textNode(text: string, at: TextAt, measureText?: TextMeasurer): TextNode {
   const fontSize = at.fontSize ?? DEFAULT_FONT_SIZE
   if (!(fontSize > 0)) throw new DocError("fontSize has to be a positive number")
   const base: TextNode = {
@@ -244,10 +253,11 @@ export function textNode(text: string, at: TextAt): TextNode {
     ...(at.underline ? { underline: true } : {}),
     ...(at.ink && at.ink !== "ink" ? { ink: at.ink } : {}),
     ...(at.boxed ? { boxed: true } : {}),
+    ...(at.boxed && at.boxFill ? { boxFill: at.boxFill } : {}),
     ...(at.link ? { link: at.link } : {}),
     ...(at.locked ? { locked: true } : {}),
   }
-  return { ...base, ...fitTextBox(base, text, fontSize) }
+  return { ...base, ...fitTextBox(base, text, fontSize, measureText) }
 }
 
 export interface ShapeAt extends NodeAt {
@@ -336,16 +346,79 @@ export function arrowNode(opts: ArrowOpts, nodes: Record<string, SquigNode>): Ar
 
 // -- changing a document -----------------------------------------------------
 
-/** The one gate: the node as the canvas would accept it, or a reason it won't. */
-function vouch(raw: unknown): SquigNode {
+/**
+ * The one gate: the node as the canvas would accept it, or a reason it won't.
+ *
+ * validNode is the shape check every door already shares; what's added here
+ * is what a stranger's node can get wrong that a paste can't — a name that
+ * reaches the prototype, a component with a prop its controls don't allow, a
+ * picture that isn't a raster. The store, the CLI, window.squig and the
+ * workspace engine all come through this, so a refusal reads the same at
+ * every door.
+ */
+export function vouchNode(raw: unknown): SquigNode {
   const n = validNode({ ...(raw as object) })
   if (!n) throw new DocError(`not a node squig can draw: ${describe(raw)}`)
-  if (!ID_PATTERN.test(n.id)) throw new DocError(`"${n.id}" isn't a usable id (letters, digits, - and _, up to 64)`)
+  if (!ID_PATTERN.test(n.id) || RESERVED_IDS.has(n.id)) {
+    throw new DocError(`"${n.id}" isn't a usable id (letters, digits, - and _, up to 80)`)
+  }
   if ([n.x, n.y, n.w, n.h].some((v) => Math.abs(v) > MAX_COORD)) {
     throw new DocError(`node "${n.id}" is off the sheet — keep coordinates within ±${MAX_COORD}`)
   }
-  if (n.type === "component" && !getDef(n.kind)) throw new DocError(`no component called "${n.kind}"`)
+  switch (n.type) {
+    case "component": {
+      const def = getDef(n.kind)
+      if (!def) throw new DocError(`no component called "${n.kind}"`)
+      checkProps(def, n.props)
+      break
+    }
+    case "text":
+      if (!(n.fontSize > 0 && n.fontSize <= MAX_FONT_SIZE)) {
+        throw new DocError(`fontSize has to be between 1 and ${MAX_FONT_SIZE}, not ${n.fontSize}`)
+      }
+      break
+    case "image":
+      if (!RASTER_SRC.test(n.src)) throw new DocError(`a picture is a png, jpeg, webp or gif data URL, not "${n.src.slice(0, 24)}…"`)
+      if (!(n.naturalW > 0 && n.naturalH > 0 && Number.isFinite(n.naturalW) && Number.isFinite(n.naturalH))) {
+        throw new DocError(`picture "${n.id}" needs its own size — positive naturalW and naturalH`)
+      }
+      break
+  }
   return n
+}
+
+/** Every prop a control governs holds a value that control could have set. */
+function checkProps(def: ComponentDef, props: Props): void {
+  for (const c of def.controls) {
+    const v = props[c.key]
+    if (v === undefined) continue
+    const bad = (why: string) => new DocError(`${def.kind}.${c.key} can't be ${JSON.stringify(v)}: ${why}`)
+    switch (c.type) {
+      case "select":
+        if (c.options && !c.options.includes(String(v))) throw bad(`it's one of ${c.options.join(", ")}`)
+        break
+      case "number":
+        if (typeof v !== "number" || !Number.isFinite(v)) throw bad("it wants a number")
+        if ((c.min !== undefined && v < c.min) || (c.max !== undefined && v > c.max)) {
+          throw bad(`it stays between ${c.min ?? "-∞"} and ${c.max ?? "∞"}`)
+        }
+        break
+      case "toggle":
+        if (typeof v !== "boolean") throw bad("it's on or off")
+        break
+      case "text":
+      case "icon":
+        if (typeof v !== "string") throw bad("it wants a string")
+        break
+    }
+  }
+  // a def that throws on its own props is the last check — it's what the
+  // canvas would do on the first paint, and the paint is the wrong place
+  try {
+    def.render({ ...def.defaults, ...props }, def.size.w, def.size.h)
+  } catch {
+    throw new DocError(`${def.kind} can't draw with those props`)
+  }
 }
 
 function describe(raw: unknown): string {
@@ -365,7 +438,7 @@ export function addNodes(doc: SquigDocument, nodes: readonly SquigNode[]): Squig
   const map = { ...doc.nodes }
   const order = [...doc.order]
   for (const raw of nodes) {
-    const n = vouch(raw)
+    const n = vouchNode(raw)
     if (map[n.id]) throw new DocError(`there is already a node called "${n.id}"`)
     map[n.id] = n
     order.push(n.id)
@@ -373,30 +446,62 @@ export function addNodes(doc: SquigDocument, nodes: readonly SquigNode[]): Squig
   return { ...doc, nodes: settleBinds(pruneDegenerateGroups(map)), order }
 }
 
+/** The keys whose change means a text layer's box has to be measured again. */
+const TEXT_LAYOUT_KEYS: ReadonlySet<string> = new Set(["text", "fontSize", "bold", "italic", "boxed", "w", "h", "fixedW", "fixedH"])
+
 /**
- * Change one node. A text layer keeps its box honest: new words, a new size
- * or a new measure re-fit the box the way the inline editor would. A
- * component's props merge, so setting the label keeps the variant. The
- * document that comes back may have changed neighbours too — a group left
- * with one member dissolves, and bound arrows follow a moved box — so read
- * the whole node map, not just the node you named.
+ * One node with a patch on it, vouched. A text layer keeps its box honest
+ * when the patch touches its words or its measure — new words, a new size,
+ * a new width re-fit the box the way the inline editor would — and keeps
+ * its box as it was for anything else, so locking or moving a label never
+ * re-lays it out. A component's props merge, so setting the label keeps the
+ * variant. This is the node half of updateNode; a caller building a batch
+ * of its own applies it per node and settles the document once at the end.
  */
-export function updateNode(doc: SquigDocument, id: string, patch: Partial<SquigNode>): SquigDocument {
-  const node = doc.nodes[id]
-  if (!node) throw new DocError(`no node called "${id}"`)
+export function patchNode(node: SquigNode, patch: Partial<SquigNode>, measureText?: TextMeasurer): SquigNode {
   if ("type" in patch && patch.type !== node.type) throw new DocError(`a ${node.type} can't become a ${patch.type}`)
   let merged: SquigNode
   if (node.type === "text") {
     const { text, fontSize, ...rest } = patch as Partial<TextNode>
-    const base: TextNode = { ...node, ...rest, ...(rest.w !== undefined ? { fixedW: true } : {}) }
-    merged = { ...base, ...fitTextBox(base, text ?? node.text, fontSize ?? node.fontSize) }
+    // a width or height handed in is a chosen one, the way a dragged handle
+    // is: the words wrap to the width, and the height is a floor they may
+    // still push past — see setTextWidth and setTextHeight in text-reflow.
+    // Unless the patch says otherwise about the flag itself: a caller
+    // handing back a size together with fixedW: false is letting go.
+    const base: TextNode = {
+      ...node,
+      ...rest,
+      ...(rest.w !== undefined && !("fixedW" in rest) ? { fixedW: true } : {}),
+      ...(rest.h !== undefined && !("fixedH" in rest) ? { fixedH: true } : {}),
+    }
+    const relaid = Object.keys(patch).some((k) => TEXT_LAYOUT_KEYS.has(k))
+    merged = relaid
+      ? { ...base, ...fitTextBox(base, text ?? node.text, fontSize ?? node.fontSize, measureText) }
+      : { ...base, text: text ?? node.text, fontSize: fontSize ?? node.fontSize }
   } else if (node.type === "component") {
     const { props, ...rest } = patch as Partial<ComponentNode>
     merged = { ...node, ...rest, ...(props ? { props: { ...node.props, ...props } } : {}) }
   } else {
     merged = { ...node, ...patch } as SquigNode
   }
-  const next = vouch({ ...merged, id })
+  return vouchNode({ ...merged, id: node.id })
+}
+
+/**
+ * Change one node in a document. The document that comes back may have
+ * changed neighbours too — a group left with one member dissolves, and bound
+ * arrows follow a moved box — so read the whole node map, not just the node
+ * you named.
+ */
+export function updateNode(
+  doc: SquigDocument,
+  id: string,
+  patch: Partial<SquigNode>,
+  measureText?: TextMeasurer
+): SquigDocument {
+  const node = doc.nodes[id]
+  if (!node) throw new DocError(`no node called "${id}"`)
+  const next = patchNode(node, patch, measureText)
   return { ...doc, nodes: settleBinds(pruneDegenerateGroups({ ...doc.nodes, [id]: next })) }
 }
 
@@ -418,12 +523,26 @@ export function removeNodes(doc: SquigDocument, ids: readonly string[]): SquigDo
  * it belongs. Locked layers are left out. Null when there is nothing to group
  * — fewer than two things, or one group that is already whole.
  */
-export function groupNodes(doc: SquigDocument, ids: readonly string[]): { doc: SquigDocument; groupId: string } | null {
+export function groupNodes(
+  doc: SquigDocument,
+  ids: readonly string[],
+  groupId: string = newId()
+): { doc: SquigDocument; groupId: string } | null {
+  const stamped = stampGroup(doc, ids, groupId)
+  return stamped && { doc: { ...stamped, nodes: pruneDegenerateGroups(stamped.nodes) }, groupId }
+}
+
+/**
+ * The stamping half of groupNodes, with the document's other groups left
+ * exactly as they are. A caller applying a batch of its own uses this and
+ * prunes once at the end, so grouping two things can't dissolve a group it
+ * is still in the middle of rebuilding.
+ */
+export function stampGroup(doc: SquigDocument, ids: readonly string[], groupId: string): SquigDocument | null {
   // a locked layer is never in a selection, so ⌘G never sees one; here the
   // ids come straight from a caller, and the plan below would leave it out
   // while the stamping would still reach it
   const members = doc.order.filter((id) => ids.includes(id) && doc.nodes[id] && !doc.nodes[id].locked)
-  const groupId = newId()
   const paths = planGroupPaths(members, doc.nodes, doc.order, groupId)
   if (!paths) return null
   const map = { ...doc.nodes }
@@ -431,7 +550,7 @@ export function groupNodes(doc: SquigDocument, ids: readonly string[]): { doc: S
   const top = doc.order.lastIndexOf(members[members.length - 1])
   const before = doc.order.slice(0, top + 1).filter((id) => !members.includes(id))
   const after = doc.order.slice(top + 1).filter((id) => !members.includes(id))
-  return { doc: { ...doc, nodes: pruneDegenerateGroups(map), order: [...before, ...members, ...after] }, groupId }
+  return { ...doc, nodes: map, order: [...before, ...members, ...after] }
 }
 
 export function bringToFront(doc: SquigDocument, ids: readonly string[]): SquigDocument {

@@ -65,8 +65,8 @@ export function measureTextWidth(text: string, style: TypeStyle): number {
 }
 
 /** Widest of a run's lines. */
-export function measureLinesWidth(lines: string[], style: TypeStyle): number {
-  return lines.reduce((max, line) => Math.max(max, measureTextWidth(line, style)), 0)
+export function measureLinesWidth(lines: string[], style: TypeStyle, measure: TextMeasurer = measureTextWidth): number {
+  return lines.reduce((max, line) => Math.max(max, measure(line, style)), 0)
 }
 
 /**

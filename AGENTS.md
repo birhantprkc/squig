@@ -92,12 +92,12 @@ then change it.
 the file drawer's calls into `lib/files.ts`. Edits go through the store so
 history and autosave stay honest.
 
-**`lib/doc.ts`** and **`lib/agent/engine.ts`** are two implementations of the
-same rules. Both vouch every node through `validNode` before it reaches a
-canvas; past that gate one is a pure local document and the other is the
-workspace's command engine, with revisions and a database behind it. A rule
-that changes has to change twice, which is the cost of having both. The
-follow-up is the engine standing on `lib/doc.ts`, not a third copy.
+**`lib/doc.ts`** is where a node rule lives, and **`lib/agent/engine.ts`**
+stands on it. The engine keeps only what is its own: zod at the API boundary,
+revisions, variations, and the workspace's policy about locked nodes and
+status codes. Everything past that boundary is `vouchNode`, `addNodes`,
+`updateNode`, `removeNodes` and `groupNodes`, so a rule that changes changes
+once and the agent's canvas behaves like the one in the browser.
 
 **`lib/sketch/svg.ts`** is the only thing that turns nodes into SVG markup. The
 image export, the CLI, `window.squig` and the workspace's PNG all print through

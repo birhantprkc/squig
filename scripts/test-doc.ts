@@ -33,11 +33,13 @@ import {
   shapeNode,
   textNode,
   updateNode,
+  patchNode,
   groupNodes,
   DocError,
   type SquigDocument,
 } from "../lib/doc.ts"
 import type { ArrowNode, ComponentNode, ShapeNode, SquigNode, TextNode } from "../lib/types.ts"
+import type { TextMeasurer } from "../lib/canvas/text-metrics.ts"
 import type { Look } from "../lib/theme.ts"
 import { check, report } from "./harness.ts"
 
@@ -383,6 +385,71 @@ const button = (id: string, x = 0, y = 0) => componentNode("button", { id, seed:
   const grouped = groupNodes(doc, ["p", "q"])!
   const alone = updateNode(grouped.doc, "p", { groupIds: undefined })
   check("leaving a group of two dissolves it for the other member too", alone.nodes.q.groupIds === undefined)
+}
+
+// -- the gate refuses what a paste never sends -------------------------------
+
+{
+  const at = { x: 0, y: 0, seed: 1 }
+  const refused = (fn: () => unknown) => {
+    try {
+      fn()
+      return false
+    } catch (e) {
+      return e instanceof DocError
+    }
+  }
+  const empty = emptyDoc("gate")
+  check("an id that reaches the prototype is refused", refused(() => addNodes(empty, [shapeNode("rect", { ...at, w: 1, h: 1, id: "__proto__" })])))
+  check("a kind named after an Object property is refused", refused(() => componentNode("constructor", at)))
+  check("a select prop off its list is refused", refused(() => addNodes(empty, [componentNode("button", { ...at, props: { variant: "neon" } })])))
+  check("a number prop past its range is refused", refused(() => addNodes(empty, [componentNode("table", { ...at, props: { rows: 999 } })])))
+  check("a toggle prop that isn't a boolean is refused", refused(() => addNodes(empty, [componentNode("switch", { ...at, props: { on: "yes" } })])))
+  check("a legal prop passes", !refused(() => addNodes(empty, [componentNode("button", { ...at, props: { variant: "outline" } })])))
+  const picture = (src: string): SquigNode =>
+    ({ id: "pic", seed: 1, type: "image", x: 0, y: 0, w: 10, h: 10, src, naturalW: 10, naturalH: 10 }) as SquigNode
+  check("an SVG data URL is refused, since it carries script", refused(() => addNodes(empty, [picture("data:image/svg+xml;base64,xxx")])))
+  check("a png is a picture", !refused(() => addNodes(empty, [picture("data:image/png;base64,AA==")])))
+  check("a zero font size is refused", refused(() => addNodes(empty, [{ ...textNode("hi", at), fontSize: 0 }])))
+}
+
+// -- a caller's own group id, and a caller's own ruler ----------------------
+
+{
+  const doc = addNodes(emptyDoc("mine"), [
+    shapeNode("rect", { x: 0, y: 0, w: 10, h: 10, id: "a", seed: 1 }),
+    shapeNode("rect", { x: 20, y: 0, w: 10, h: 10, id: "b", seed: 1 }),
+  ])
+  const g = groupNodes(doc, ["a", "b"], "chosen")
+  check("a group can be named by the caller", g?.groupId === "chosen" && g.doc.nodes.a.groupIds?.[0] === "chosen")
+
+  const wide: TextMeasurer = (text) => text.length * 40
+  const guessed = textNode("one two three four", { x: 0, y: 0, w: 120, seed: 1 })
+  const measured = textNode("one two three four", { x: 0, y: 0, w: 120, seed: 1 }, wide)
+  check("a measurer that knows the face wraps the words differently", measured.h > guessed.h)
+}
+
+// -- a patch reaches only as far as it says -----------------------------------
+
+{
+  const doc = addNodes(emptyDoc("still"), [
+    { ...textNode("Hi", { x: 0, y: 0, align: "center", fontSize: 20, seed: 1, id: "t" }), x: 0, w: 160, h: 80 } as SquigNode,
+  ])
+  const locked = updateNode(doc, "t", { locked: true })
+  check("locking a label leaves its box alone", locked.nodes.t.w === 160 && locked.nodes.t.h === 80)
+  const reworded = updateNode(doc, "t", { text: "Hello there" } as Partial<SquigNode>)
+  check("…while new words re-fit it", reworded.nodes.t.w !== 160)
+  const wrapped = textNode("two lines of words here", { x: 0, y: 0, w: 80, fontSize: 18, seed: 1, id: "p" })
+  const squashed = patchNode(wrapped, { h: 1 } as Partial<SquigNode>) as TextNode
+  check("a height patch is a floor the words may push past", squashed.h >= wrapped.h && squashed.fixedH === true)
+  const roomy = patchNode(wrapped, { h: 300 } as Partial<SquigNode>) as TextNode
+  check("…and a roomy one is kept", roomy.h === 300)
+  const letGo = patchNode(roomy, { h: 300, fixedH: undefined } as Partial<SquigNode>) as TextNode
+  check("a size handed back with the flag let go is not a chosen size", letGo.fixedH === undefined && letGo.h === wrapped.h)
+  const loose = patchNode(wrapped, { w: 200, fixedW: false } as Partial<SquigNode>) as TextNode
+  check("…and the same for width", !loose.fixedW)
+  const long = "y".repeat(80)
+  check("an eighty-character id is welcome", addNodes(emptyDoc("ids"), [shapeNode("rect", { x: 0, y: 0, w: 1, h: 1, id: long, seed: 1 })]).order[0] === long)
 }
 
 report("document checks passed")

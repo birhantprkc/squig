@@ -48,7 +48,7 @@ export const FIT_PADDING = 96
  * band is quite likely under one of them. Being generous here costs a pan you
  * might not have needed; being stingy costs the pan you did.
  */
-export const REVEAL_MARGIN = 120
+const REVEAL_MARGIN = 120
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(Math.max(v, lo), hi)
 

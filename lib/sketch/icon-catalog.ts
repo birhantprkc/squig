@@ -11,7 +11,7 @@
 import { PHOSPHOR_PATHS } from "./phosphor-paths"
 import { ALL_ICON_NAMES } from "./phosphor/names"
 
-export const ICON_WEIGHTS = ["thin", "light", "regular", "bold", "fill"] as const
+const ICON_WEIGHTS = ["thin", "light", "regular", "bold", "fill"] as const
 export type IconWeight = (typeof ICON_WEIGHTS)[number]
 
 export function normalizeIconWeight(v: unknown): IconWeight {

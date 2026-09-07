@@ -8,8 +8,9 @@
 // ---------------------------------------------------------------------------
 
 import type { Prim } from "@/lib/sketch/kit"
-import { rect, pill, ellipse, line, text, icon, place, loremLines, truncate, textWidth } from "@/lib/sketch/kit"
+import { rect, pill, ellipse, line, text, icon, loremLines, truncate, textWidth } from "@/lib/sketch/kit"
 import type { ComponentDef, Props } from "./registry"
+import { sub } from "./compose"
 import { buttonDef } from "./defs-basic"
 import { searchInputDef, navTabsPillDef, bottomNavDef, listItemDef, cardMediaDef } from "./defs-more"
 
@@ -38,10 +39,6 @@ const listOr = (p: Props, k: string, stock: readonly string[]): string[] => {
   const given = str(p, k, "").split(",").map((s) => s.trim())
   const n = Math.max(stock.length, given.length)
   return Array.from({ length: n }, (_, i) => given[i] || stock[i % stock.length])
-}
-
-function sub(def: ComponentDef, props: Props, x: number, y: number, w: number, h: number): Prim[] {
-  return place(def.render({ ...def.defaults, ...props }, w, h), x, y)
 }
 
 // -- shared drawing ----------------------------------------------------------

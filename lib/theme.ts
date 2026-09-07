@@ -178,7 +178,7 @@ export function bgOf(p: Palette, shade: PaperShade): string {
 }
 
 /** The dot grid, kept readable against whatever the sheet just became. */
-export function gridOf(p: Palette, shade: PaperShade): string {
+function gridOf(p: Palette, shade: PaperShade): string {
   return shade === "shaded" ? mix(p.grid, p.ink, 0.15) : p.grid
 }
 

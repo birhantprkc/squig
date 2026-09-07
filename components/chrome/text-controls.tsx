@@ -35,7 +35,7 @@ import { IconToggle, SegmentedToggles, type SegmentOption } from "@/components/u
 
 /** Drawn as icons, not as styled letters — a glyph small enough to fit the
     toggle is too small to read as bold-versus-regular at a glance. */
-export const TEXT_STYLES = [
+const TEXT_STYLES = [
   { key: "bold", label: "Bold", icon: TextBIcon },
   { key: "italic", label: "Italic", icon: TextItalicIcon },
   { key: "underline", label: "Underline", icon: TextUnderlineIcon },

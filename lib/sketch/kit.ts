@@ -246,5 +246,5 @@ export function loremLines(x: number, y: number, w: number, count: number, gap =
 // Phosphor-backed; see ./icons for the name list and aliases, and
 // ./icon-catalog for the lazy full catalog and weights.
 
-export { icon, ICON_NAMES, resolveIconName, type IconName } from "./icons"
-export { ICON_WEIGHTS, normalizeIconWeight, type IconWeight } from "./icon-catalog"
+export { icon, resolveIconName } from "./icons"
+export { normalizeIconWeight } from "./icon-catalog"

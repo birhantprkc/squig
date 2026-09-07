@@ -17,7 +17,7 @@ export const TEXT_LINE_HEIGHT = 1.35
  * face at this line height lands within a hair of one em — so the editor, which
  * computes it from the real font metrics, sits on the line the renderer drew.
  */
-export const TEXT_FIRST_BASELINE = 1
+const TEXT_FIRST_BASELINE = 1
 
 /** Descender room under the last baseline, again as a multiple of the size. */
 const DESCENDER = 0.3

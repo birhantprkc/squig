@@ -14,10 +14,10 @@ export const MIXED_LABEL = "–"
 
 export type Shared<T> = { mixed: true; value?: undefined } | { mixed: false; value: T }
 
-export const MIXED = { mixed: true } as const
+const MIXED = { mixed: true } as const
 
 /** A conditional control is only useful while its companion mode is active. */
-export function controlIsVisible(node: ComponentNode, control: ControlDef): boolean {
+function controlIsVisible(node: ComponentNode, control: ControlDef): boolean {
   if (!control.visibleWhen) return true
   const actual = resolveProp(node, control.visibleWhen.key)
   const accepted = Array.isArray(control.visibleWhen.equals)

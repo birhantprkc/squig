@@ -7,6 +7,7 @@
 import type { Prim } from "@/lib/sketch/kit"
 import { rect, ellipse, line, text, icon, place, loremLines, truncate, textWidth } from "@/lib/sketch/kit"
 import type { ComponentDef, Props } from "./registry"
+import { sub } from "./compose"
 import { buttonDef, inputDef, textareaDef, badgeDef, avatarDef, switchDef } from "./defs-basic"
 import { imageDef, breadcrumbDef } from "./defs-display"
 
@@ -36,11 +37,6 @@ const listOr = (p: Props, k: string, stock: readonly string[]): string[] => {
   const given = str(p, k, "").split(",").map((s) => s.trim())
   const n = Math.max(stock.length, given.length)
   return Array.from({ length: n }, (_, i) => given[i] || stock[i % stock.length])
-}
-
-/** Compose a child def at an offset. */
-function sub(def: ComponentDef, props: Props, x: number, y: number, w: number, h: number): Prim[] {
-  return place(def.render({ ...def.defaults, ...props }, w, h), x, y)
 }
 
 // -- layout helpers ---------------------------------------------------------

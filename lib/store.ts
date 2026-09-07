@@ -70,14 +70,14 @@ interface DocSnapshot {
 
 export type PanelKind = "components" | "blocks" | null
 
-export interface ContextMenuState {
+interface ContextMenuState {
   x: number
   y: number
   /** node the menu was opened on, or null for the canvas itself */
   nodeId: string | null
 }
 
-export interface InspectorFocus {
+interface InspectorFocus {
   /** the selected component whose property should receive focus */
   id: string
   /** the component control key, not a DOM id */

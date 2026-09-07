@@ -1,6 +1,9 @@
 "use client"
 
-import { useEffect } from "react"
+import { SidebarSimpleIcon } from "@phosphor-icons/react"
+import { Panel } from "@/components/ui/panel"
+import { AgentBridge } from "@/components/agent/bridge"
+import { useEffect, useState } from "react"
 import { useSquig } from "@/lib/store"
 import { installAgentBridge } from "@/lib/agent-bridge"
 import { Canvas } from "@/components/canvas/canvas"
@@ -18,6 +21,7 @@ import { SmallScreenNote } from "@/components/chrome/small-screen-note"
 import { kbd } from "@/lib/shortcuts"
 
 export default function Home() {
+  const [sidebarVisible, setSidebarVisible] = useState(true)
   const hydrated = useSquig((s) => s.hydrated)
   const hydrate = useSquig((s) => s.hydrate)
   const uiHidden = useSquig((s) => s.uiHidden)
@@ -45,14 +49,19 @@ export default function Home() {
   return (
     <main className="relative h-full">
       <Canvas />
+          <Panel style={{ display: uiHidden ? "none" : undefined }} className="absolute top-4 right-4 z-40 flex-row items-center gap-1 p-1">
+            {process.env.NEXT_PUBLIC_SQUIG_OFFLINE !== "1" && <AgentBridge hidden={uiHidden} />}
+            <button className="canvas-action" aria-label={sidebarVisible ? "Hide sidebar" : "Show sidebar"} aria-pressed={sidebarVisible} title={sidebarVisible ? "Hide sidebar" : "Show sidebar"} onClick={() => setSidebarVisible(v => !v)}><SidebarSimpleIcon size={18} /></button>
+          </Panel>
       {/* ⌘\ clears the room — the canvas and what you've selected, nothing else */}
       {!uiHidden && (
         <>
           <TopCorner />
+
           <FileName />
           <LeftRail />
           <LibraryPanel />
-          <Inspector />
+          {sidebarVisible && <Inspector />}
           <ZoomPill />
           <CommandHint />
           <SmallScreenNote />

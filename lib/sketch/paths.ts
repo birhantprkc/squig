@@ -1,16 +1,15 @@
-// ---------------------------------------------------------------------------
-// Sketch paths — the half of the renderer that runs anywhere, node included.
-//
-// Everything here is geometry: prims in, SVG path data out. No DOM, no React,
-// so the PNG/SVG export can print exactly the marks the canvas draws instead
-// of keeping a second, drifting copy of the look.
-// ---------------------------------------------------------------------------
-
 import rough from "roughjs"
+import { cropOf, type ImageNode } from "@/lib/types"
 import type { Options } from "roughjs/bin/core"
 import type { RoughGenerator } from "roughjs/bin/generator"
-import { HAND, INK, SHADE, type InkColor, type Prim, type PrimOpts } from "@/lib/sketch/kit"
-import { cropOf, type ImageNode } from "@/lib/types"
+import {
+  HAND,
+  INK,
+  SHADE,
+  type InkColor,
+  type Prim,
+  type PrimOpts,
+} from "./kit"
 
 const gen: RoughGenerator = rough.generator()
 
@@ -74,7 +73,7 @@ function primOptions(p: Prim, seed: number): Options {
     bowing: HAND.bowing,
     stroke: INK[o?.tone ?? "ink"],
     // an explicit strokeWidth is already a considered weight — leave it alone
-    strokeWidth: o?.strokeWidth ?? (HAND.strokeWidth * PEN[o?.stroke ?? "ink"]),
+    strokeWidth: o?.strokeWidth ?? HAND.strokeWidth * PEN[o?.stroke ?? "ink"],
     fill: undefined,
     disableMultiStroke: true,
     disableMultiStrokeFill: true,
@@ -95,9 +94,16 @@ function ellipsePath(cx: number, cy: number, w: number, h: number): string {
 }
 
 /** Rounded-rect as SVG path data — rough.js has no radius of its own. */
-function roundRectPath(x: number, y: number, w: number, h: number, r: number): string {
+function roundRectPath(
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  r: number,
+): string {
   const rr = Math.max(0, Math.min(r, Math.abs(w) / 2, Math.abs(h) / 2))
-  if (rr < 0.5) return `M${x} ${y} L${x + w} ${y} L${x + w} ${y + h} L${x} ${y + h} Z`
+  if (rr < 0.5)
+    return `M${x} ${y} L${x + w} ${y} L${x + w} ${y + h} L${x} ${y + h} Z`
   return [
     `M${x + rr} ${y}`,
     `L${x + w - rr} ${y}`,
@@ -112,7 +118,7 @@ function roundRectPath(x: number, y: number, w: number, h: number, r: number): s
   ].join(" ")
 }
 
-export interface PathBit {
+interface PathBit {
   d: string
   stroke: string
   strokeWidth: number
@@ -121,7 +127,7 @@ export interface PathBit {
 }
 
 /** Icon / raw-path prims, rendered crisp rather than through rough.js. */
-export interface CrispBit {
+interface CrispBit {
   d: string[]
   transform: string
   mode: "fill" | "stroke"
@@ -129,7 +135,10 @@ export interface CrispBit {
   strokeWidth: number
 }
 
-function drawableToPaths(drawable: ReturnType<RoughGenerator["rectangle"]>, dash?: string): PathBit[] {
+function drawableToPaths(
+  drawable: ReturnType<RoughGenerator["rectangle"]>,
+  dash?: string,
+): PathBit[] {
   return gen.toPaths(drawable).map((pi) => ({
     d: pi.d,
     stroke: pi.stroke,
@@ -142,27 +151,47 @@ function drawableToPaths(drawable: ReturnType<RoughGenerator["rectangle"]>, dash
 
 export function primsToPaths(
   prims: Prim[],
-  seed: number
-): { paths: PathBit[]; texts: Extract<Prim, { t: "text" }>[]; crisp: CrispBit[] } {
+  seed: number,
+): {
+  paths: PathBit[]
+  texts: Extract<Prim, { t: "text" }>[]
+  crisp: CrispBit[]
+} {
   const paths: PathBit[] = []
   const texts: Extract<Prim, { t: "text" }>[] = []
   const crisp: CrispBit[] = []
 
   prims.forEach((p, i) => {
-    const s = ((seed + i * 7919) % 2 ** 31) || 1
+    const s = (seed + i * 7919) % 2 ** 31 || 1
     const dash = "o" in p && p.o?.dashed ? "6 4" : undefined
     try {
       // block shadow first, so the surface prints over it
       if ("o" in p && p.o?.shadow && (p.t === "rect" || p.t === "ellipse")) {
         const d =
           p.t === "rect"
-            ? roundRectPath(p.x + SHADOW_OFFSET, p.y + SHADOW_OFFSET, p.w, p.h, p.r ?? p.o?.r ?? HAND.radius)
+            ? roundRectPath(
+                p.x + SHADOW_OFFSET,
+                p.y + SHADOW_OFFSET,
+                p.w,
+                p.h,
+                p.r ?? p.o?.r ?? HAND.radius,
+              )
             : null
         if (d) {
-          paths.push({ d, stroke: "none", strokeWidth: 0, fill: SHADE.shadeStrong })
+          paths.push({
+            d,
+            stroke: "none",
+            strokeWidth: 0,
+            fill: SHADE.shadeStrong,
+          })
         } else {
           paths.push({
-            d: ellipsePath(p.x + SHADOW_OFFSET + p.w / 2, p.y + SHADOW_OFFSET + p.h / 2, p.w, p.h),
+            d: ellipsePath(
+              p.x + SHADOW_OFFSET + p.w / 2,
+              p.y + SHADOW_OFFSET + p.h / 2,
+              p.w,
+              p.h,
+            ),
             stroke: "none",
             strokeWidth: 0,
             fill: SHADE.shadeStrong,
@@ -172,21 +201,59 @@ export function primsToPaths(
       switch (p.t) {
         case "rect": {
           const r = p.r ?? p.o?.r ?? HAND.radius
-          paths.push(...drawableToPaths(gen.path(roundRectPath(p.x, p.y, p.w, p.h, r), primOptions(p, s)), dash))
+          paths.push(
+            ...drawableToPaths(
+              gen.path(roundRectPath(p.x, p.y, p.w, p.h, r), primOptions(p, s)),
+              dash,
+            ),
+          )
           break
         }
         case "ellipse":
-          paths.push(...drawableToPaths(gen.ellipse(p.x + p.w / 2, p.y + p.h / 2, p.w, p.h, primOptions(p, s)), dash))
+          paths.push(
+            ...drawableToPaths(
+              gen.ellipse(
+                p.x + p.w / 2,
+                p.y + p.h / 2,
+                p.w,
+                p.h,
+                primOptions(p, s),
+              ),
+              dash,
+            ),
+          )
           break
         case "line":
-          paths.push(...drawableToPaths(gen.line(p.x1, p.y1, p.x2, p.y2, primOptions(p, s)), dash))
+          paths.push(
+            ...drawableToPaths(
+              gen.line(p.x1, p.y1, p.x2, p.y2, primOptions(p, s)),
+              dash,
+            ),
+          )
           break
         case "curve":
-          paths.push(...drawableToPaths(gen.path(`M ${p.x1} ${p.y1} Q ${p.cx} ${p.cy} ${p.x2} ${p.y2}`, primOptions(p, s)), dash))
+          paths.push(
+            ...drawableToPaths(
+              gen.path(
+                `M ${p.x1} ${p.y1} Q ${p.cx} ${p.cy} ${p.x2} ${p.y2}`,
+                primOptions(p, s),
+              ),
+              dash,
+            ),
+          )
           break
         case "poly":
-          if (p.close) paths.push(...drawableToPaths(gen.polygon(p.pts, primOptions(p, s)), dash))
-          else paths.push(...drawableToPaths(gen.linearPath(p.pts, primOptions(p, s)), dash))
+          if (p.close)
+            paths.push(
+              ...drawableToPaths(gen.polygon(p.pts, primOptions(p, s)), dash),
+            )
+          else
+            paths.push(
+              ...drawableToPaths(
+                gen.linearPath(p.pts, primOptions(p, s)),
+                dash,
+              ),
+            )
           break
         case "path": {
           // Phosphor glyphs are filled outlines, so pen pressure has nothing to
@@ -198,7 +265,8 @@ export function primsToPaths(
             transform: `translate(${p.x} ${p.y}) scale(${k})`,
             mode: p.mode,
             color: INK.ink,
-            strokeWidth: ((p.o?.strokeWidth ?? 12) * PEN[p.o?.stroke ?? "ink"]) / k,
+            strokeWidth:
+              ((p.o?.strokeWidth ?? 12) * PEN[p.o?.stroke ?? "ink"]) / k,
           })
           break
         }
@@ -219,7 +287,9 @@ export function primsToPaths(
  * the spot they were drawn instead of throwing them off the far side of the
  * node.
  */
-export function mirrorGlyphs(t: Extract<Prim, { t: "text" }>): string | undefined {
+export function mirrorGlyphs(
+  t: Extract<Prim, { t: "text" }>,
+): string | undefined {
   if (!t.mirrorX && !t.mirrorY) return undefined
   const [sx, sy] = [t.mirrorX ? -1 : 1, t.mirrorY ? -1 : 1]
   return `translate(${t.x * (1 - sx)} ${t.y * (1 - sy)}) scale(${sx} ${sy})`

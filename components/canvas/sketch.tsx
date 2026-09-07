@@ -1,10 +1,7 @@
 "use client"
 
 // ---------------------------------------------------------------------------
-// Sketch renderers — the React half: prims and nodes into SVG elements.
-//
-// The marks themselves are geometry, and live in lib/sketch/paths so the image
-// export can print the same ones.
+// Sketch renderers — turn prims / nodes into SVG paths.
 //
 // The look is early-web risograph: one saturated ink on warm paper, confident
 // closed lines, and flat shaded fills — two tones, no patterns — carrying the
@@ -17,7 +14,7 @@ import { INK, type Prim } from "@/lib/sketch/kit"
 import { imagePlacement, mirrorBox, mirrorGlyphs, primsToPaths } from "@/lib/sketch/paths"
 import { useIconCatalogVersion } from "@/lib/sketch/use-icon-catalog"
 import { nodePrims } from "@/lib/sketch/node-prims"
-import type { ImageNode, SquigNode } from "@/lib/types"
+import { cropOf, type ImageNode, type SquigNode } from "@/lib/types"
 
 export const SketchPrims = memo(function SketchPrims({
   prims,
@@ -134,8 +131,6 @@ export const NodeSketch = memo(function NodeSketch({
     }
   }, [node, catalogVersion])
 
-  // keyed on shapeKey, not node: the node object is a new identity on every
-  // drag frame, while its marks only change when the key does
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const prims = useMemo<Prim[]>(() => nodePrims(node), [shapeKey, node.type])
 
@@ -177,3 +172,4 @@ function ImagePixels({ node }: { node: ImageNode }) {
     </svg>
   )
 }
+

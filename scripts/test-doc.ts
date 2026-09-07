@@ -37,7 +37,7 @@ import {
   DocError,
   type SquigDocument,
 } from "../lib/doc.ts"
-import type { ArrowNode, ShapeNode, SquigNode, TextNode } from "../lib/types.ts"
+import type { ArrowNode, ComponentNode, ShapeNode, SquigNode, TextNode } from "../lib/types.ts"
 import type { Look } from "../lib/theme.ts"
 import { check, report } from "./harness.ts"
 
@@ -366,6 +366,23 @@ const button = (id: string, x = 0, y = 0) => componentNode("button", { id, seed:
   check("…and the locked one is left out of it", g?.doc.nodes.bg.groupIds === undefined)
   check("…and left where it was in the order", g?.doc.order[0] === "bg")
   check("a locked layer and one loose one is nothing to group", groupNodes(doc, ["bg", "a"]) === null)
+}
+
+// -- an update reaches exactly as far as it should ---------------------------
+
+{
+  const doc = addNodes(emptyDoc("reach"), [
+    componentNode("button", { x: 0, y: 0, id: "b", seed: 1, props: { variant: "outline", label: "Back" } }),
+    shapeNode("rect", { x: 0, y: 0, w: 10, h: 10, id: "p", seed: 1 }),
+    shapeNode("rect", { x: 20, y: 0, w: 10, h: 10, id: "q", seed: 1 }),
+  ])
+  const relabeled = updateNode(doc, "b", { props: { label: "Next" } } as Partial<SquigNode>)
+  const b = relabeled.nodes.b as ComponentNode
+  check("setting a label keeps the variant", b.props.variant === "outline" && b.props.label === "Next")
+
+  const grouped = groupNodes(doc, ["p", "q"])!
+  const alone = updateNode(grouped.doc, "p", { groupIds: undefined })
+  check("leaving a group of two dissolves it for the other member too", alone.nodes.q.groupIds === undefined)
 }
 
 report("document checks passed")

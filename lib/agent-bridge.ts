@@ -96,8 +96,11 @@ const api: SquigAgentApi = {
   add(nodes) {
     // lib/doc does the arguing; what comes back out of it has settled arrow
     // anchors on it, so the store gets the vouched copy rather than the input
+    // cloned on the way in: the store keeps what it is handed, in history
+    // too, and a caller that goes on editing its own object must not be
+    // editing an undo step
     const before = current()
-    const after = addNodes(before, nodes)
+    const after = addNodes(before, structuredClone(nodes))
     const ids = after.order.slice(before.order.length)
     const store = useSquig.getState()
     store.addNodes(ids.map((id) => after.nodes[id]))
@@ -113,13 +116,24 @@ const api: SquigAgentApi = {
   addArrow: (opts) => api.add([arrowNode(opts, useSquig.getState().nodes)])[0],
 
   update(id, patch) {
-    const next = updateNode(current(), id, patch).nodes[id]
+    const before = current()
+    const after = updateNode(before, id, structuredClone(patch))
+    // the change can reach past the node named — a group left with one
+    // member dissolves on its partner too — so commit every node that moved
+    const changed: Record<string, SquigNode> = {}
+    for (const [nid, n] of Object.entries(after.nodes)) if (n !== before.nodes[nid]) changed[nid] = n
     const store = useSquig.getState()
-    // updateNode on its own is the store's mid-drag write and takes no
+    // updateNodes on its own is the store's mid-drag write and takes no
     // checkpoint; an agent's change is a finished edit, so it gets one
     store.edit(() => {
-      store.updateNode(id, next)
-      if (next.locked && store.selection.includes(id)) store.setSelection(store.selection.filter((i) => i !== id))
+      store.updateNodes(changed)
+      // a locked node leaves the selection, and a group that just dissolved
+      // stops being what the selection stands for
+      const s = useSquig.getState()
+      const loose = s.selection.filter((i) => !after.nodes[i]?.locked)
+      const gid = s.selectionGroupId
+      const groupAlive = !!gid && loose.some((i) => after.nodes[i]?.groupIds?.includes(gid))
+      if (loose.length !== s.selection.length || (gid && !groupAlive)) s.setSelection(loose, groupAlive ? gid : null)
     })
   },
   remove: (ids) => useSquig.getState().removeNodes(ids),

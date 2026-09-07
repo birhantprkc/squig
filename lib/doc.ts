@@ -375,7 +375,11 @@ export function addNodes(doc: SquigDocument, nodes: readonly SquigNode[]): Squig
 
 /**
  * Change one node. A text layer keeps its box honest: new words, a new size
- * or a new measure re-fit the box the way the inline editor would.
+ * or a new measure re-fit the box the way the inline editor would. A
+ * component's props merge, so setting the label keeps the variant. The
+ * document that comes back may have changed neighbours too — a group left
+ * with one member dissolves, and bound arrows follow a moved box — so read
+ * the whole node map, not just the node you named.
  */
 export function updateNode(doc: SquigDocument, id: string, patch: Partial<SquigNode>): SquigDocument {
   const node = doc.nodes[id]
@@ -386,6 +390,9 @@ export function updateNode(doc: SquigDocument, id: string, patch: Partial<SquigN
     const { text, fontSize, ...rest } = patch as Partial<TextNode>
     const base: TextNode = { ...node, ...rest, ...(rest.w !== undefined ? { fixedW: true } : {}) }
     merged = { ...base, ...fitTextBox(base, text ?? node.text, fontSize ?? node.fontSize) }
+  } else if (node.type === "component") {
+    const { props, ...rest } = patch as Partial<ComponentNode>
+    merged = { ...node, ...rest, ...(props ? { props: { ...node.props, ...props } } : {}) }
   } else {
     merged = { ...node, ...patch } as SquigNode
   }

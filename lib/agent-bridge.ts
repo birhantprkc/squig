@@ -55,6 +55,9 @@ export interface SquigAgentApi {
   remove(ids: string[]): void
   /** ⌘G on these; the new group's id, or null when there was nothing to group */
   group(ids: string[]): string | null
+  /** z-order: later is drawn on top, so a backdrop goes to the back */
+  toFront(ids: string[]): void
+  toBack(ids: string[]): void
   select(ids: string[]): void
   selection(): string[]
   zoomToFit(): void
@@ -110,6 +113,9 @@ const api: SquigAgentApi = {
     useSquig.getState().groupSelected()
     return useSquig.getState().selectionGroupId
   },
+
+  toFront: (ids) => useSquig.getState().bringToFront(ids),
+  toBack: (ids) => useSquig.getState().sendToBack(ids),
 
   select: (ids) => useSquig.getState().setSelection(ids),
   selection: () => [...useSquig.getState().selection],

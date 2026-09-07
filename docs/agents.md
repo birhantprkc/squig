@@ -128,6 +128,8 @@ squig.addArrow({ from, to, head, lineStyle })
 squig.update(id, patch)
 squig.remove(ids)
 squig.group(ids)                   // the new group id, or null
+squig.toFront(ids)                 // z-order: later is on top
+squig.toBack(ids)
 squig.select(ids)
 squig.selection()                  // the ids currently selected
 squig.zoomToFit()

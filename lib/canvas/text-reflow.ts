@@ -9,7 +9,7 @@ import {
   textContentWidth,
   verticalAnchorFactor,
 } from "@/lib/sketch/text-layout"
-import { measureLinesWidth, wrapText } from "./text-metrics"
+import { measureLinesWidth, wrapText, type TextMeasurer } from "./text-metrics"
 import type { TextNode } from "@/lib/types"
 
 /** Narrow enough to hug an "i", wide enough to still be worth clicking. */
@@ -54,16 +54,21 @@ function fitHeight(n: TextNode, natural: number): number {
  * A mirrored node pins the opposite edge: flipping swaps which end of the box
  * the run hangs off (see mirrorPrims), so the anchor has to swap with it.
  */
-export function fitTextBox(n: TextNode, text: string, fontSize = n.fontSize): Partial<TextNode> {
+export function fitTextBox(
+  n: TextNode,
+  text: string,
+  fontSize = n.fontSize,
+  measureText?: TextMeasurer
+): Partial<TextNode> {
   const style = { size: fontSize, bold: n.bold, italic: n.italic }
   const boxed = !!n.boxed
   if (n.fixedW) {
     const measure = textContentWidth(n.w, fontSize, boxed)
-    const natural = textBlockHeight(wrapText(text, measure, style).length, fontSize, boxed)
+    const natural = textBlockHeight(wrapText(text, measure, style, measureText).length, fontSize, boxed)
     return { text, fontSize, h: fitHeight(n, natural) }
   }
   const lines = (text || " ").split("\n")
-  const measured = measureLinesWidth(lines, style)
+  const measured = measureLinesWidth(lines, style, measureText)
   const contentW = Math.max(MIN_WIDTH, measured + SLACK)
   const oldPad = textBoxPadding(n.fontSize, boxed)
   const nextPad = textBoxPadding(fontSize, boxed)

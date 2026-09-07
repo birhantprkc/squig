@@ -2,16 +2,16 @@ import { lookSchema, nodeFields } from "./schema"
 import { nanoid } from "nanoid"
 import {
   DocError,
-  addNodes,
   bringToFront,
   emptyDoc,
   groupNodes,
-  removeNodes,
+  patchNode,
   sendToBack,
   textNode,
-  updateNode,
   vouchNode,
 } from "@/lib/doc"
+import { pruneDegenerateGroups } from "@/lib/canvas/groups"
+import type { TextMeasurer } from "@/lib/canvas/text-metrics"
 import { textMeasurer } from "./text-metrics"
 import { getDef } from "@/lib/library/registry"
 import { breakApart } from "@/lib/library/break-apart"
@@ -43,18 +43,13 @@ export function emptyDocument(name: string): CanvasDocument {
 const safeId = (s: string) =>
   /^[a-zA-Z0-9_-]{1,80}$/.test(s) &&
   !["__proto__", "constructor", "prototype"].includes(s)
-/**
- * lib/doc refuses in sentences; the workspace refuses in status codes. Every
- * refusal here is something the caller sent, so it leaves as a 400 — except a
- * name that is already on the sheet, which this API has always answered 409.
- */
+/** lib/doc refuses in sentences; the workspace refuses in status codes. */
 function withDoc<T>(fn: () => T): T {
   try {
     return fn()
   } catch (error) {
     if (!(error instanceof DocError)) throw error
-    const taken = error.message.startsWith("there is already a node called")
-    throw new AgentError(taken ? 409 : 400, error.message)
+    throw new AgentError(400, error.message)
   }
 }
 /**
@@ -117,7 +112,9 @@ export function validateDocument(doc: CanvasDocument): CanvasDocument {
     throw new AgentError(413, "Document exceeds 4 MB")
   return {
     ...doc,
-    nodes: settleBinds(nodes),
+    // the batch's invariants, kept once at the end rather than after every
+    // step: a group of one dissolves, an arrow follows its boxes or lets go
+    nodes: settleBinds(pruneDegenerateGroups(nodes)),
     variations: doc.variations.filter((v) =>
       v.nodeIds.every((id) => Object.hasOwn(nodes, id)),
     ),
@@ -127,12 +124,14 @@ export function applyOperations(
   original: CanvasDocument,
   operations: Operation[],
 ): { document: CanvasDocument; createdIds: string[] } {
-  // lib/doc hands back a new document every time, but align, distribute and
-  // flip still write through the node objects, so the batch owns a copy and a
-  // refused operation leaves the caller's document where it was.
+  // The batch owns a copy, so a refused operation leaves the caller's
+  // document where it was. Steps write into the map and validateDocument
+  // settles the whole thing at the end — which is what lets an arrow in one
+  // add name a box the next add brings, the way it always could.
   let d = structuredClone(original)
-  // the real faces, so a note wraps here exactly where the render breaks it
-  const measure = textMeasurer(original.look.font)
+  // the real faces, so a note wraps here exactly where the render breaks it;
+  // read off the document as it stands, since a look op may have changed it
+  const measure: TextMeasurer = (text, style) => textMeasurer(d.look.font)(text, style)
   const createdIds: string[] = []
   const members = (ids: string[], allowLocked = false) =>
     [...new Set(ids)].map((id) => {
@@ -143,11 +142,14 @@ export function applyOperations(
         throw new AgentError(409, `Node is locked: ${id}; unlock it explicitly`)
       return n
     })
-  // one call per batch of new nodes: a group only survives the trip if all of
-  // its members arrive together, since a group of one is not a group
   const place = (nodes: readonly SquigNode[]) => {
-    d = withDoc(() => addNodes(d, nodes)) as CanvasDocument
-    for (const n of nodes) createdIds.push(n.id)
+    for (const n of nodes) {
+      if (Object.hasOwn(d.nodes, n.id))
+        throw new AgentError(409, `there is already a node called "${n.id}"`)
+      d.nodes[n.id] = n
+      d.order.push(n.id)
+      createdIds.push(n.id)
+    }
   }
   for (const op of operations) {
     switch (op.op) {
@@ -199,21 +201,29 @@ export function applyOperations(
       }
       case "update":
         for (const { id, patch, unset } of op.patches) {
-          members(
+          const n = members(
             [id],
             patch.locked === false &&
               Object.keys(patch).length === 1 &&
               !unset?.length,
-          )
+          )[0]
           if (patch.id !== undefined || patch.type !== undefined)
             throw new AgentError(400, "Node id and type are immutable")
           const changes = {
             ...patch,
             ...Object.fromEntries((unset ?? []).map((f) => [f, undefined])),
           } as Partial<SquigNode>
-          d = withDoc(() =>
-            updateNode(d, id, changes, measure),
-          ) as CanvasDocument
+          // zod first: a patch is an untyped record, and the text fitter
+          // would choke on words that aren't a string before the gate saw them
+          const parsed = nodeFields.safeParse({ ...n, ...changes })
+          if (!parsed.success)
+            throw new AgentError(
+              400,
+              parsed.error.issues
+                .map((i) => `${i.path.join(".")}: ${i.message}`)
+                .join("; "),
+            )
+          d.nodes[id] = withDoc(() => patchNode(n, changes, measure))
         }
         break
       case "remove_variation":
@@ -221,11 +231,10 @@ export function applyOperations(
           throw new AgentError(404, "Variation not found")
         d.variations = d.variations.filter((v) => v.id !== op.id)
         break
-      case "delete": {
-        const ids = members(op.ids).map((n) => n.id)
-        d = withDoc(() => removeNodes(d, ids)) as CanvasDocument
+      case "delete":
+        for (const n of members(op.ids)) delete d.nodes[n.id]
+        d.order = d.order.filter((id) => !op.ids.includes(id))
         break
-      }
       case "duplicate": {
         const originals = members(op.ids, true)
         const ids = new Map(originals.map((n) => [n.id, nanoid(12)]))
@@ -273,13 +282,12 @@ export function applyOperations(
               groupIds: n.groupIds,
             } as unknown as Record<string, unknown>),
           )
-          d = withDoc(() => removeNodes(d, [n.id])) as CanvasDocument
+          delete d.nodes[n.id]
+          d.order.splice(at, 1)
           place(parts)
           // the parts landed on top; they belong where the component stood
-          const ids = parts.map((p) => p.id)
-          const fresh = new Set(ids)
-          const rest = d.order.filter((id) => !fresh.has(id))
-          d = { ...d, order: [...rest.slice(0, at), ...ids, ...rest.slice(at)] }
+          if (parts.length) d.order.splice(-parts.length)
+          d.order.splice(at, 0, ...parts.map((p) => p.id))
         }
         break
       case "flip":

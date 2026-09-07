@@ -428,4 +428,18 @@ const button = (id: string, x = 0, y = 0) => componentNode("button", { id, seed:
   check("a measurer that knows the face wraps the words differently", measured.h > guessed.h)
 }
 
+// -- a patch reaches only as far as it says -----------------------------------
+
+{
+  const doc = addNodes(emptyDoc("still"), [
+    { ...textNode("Hi", { x: 0, y: 0, align: "center", fontSize: 20, seed: 1, id: "t" }), x: 0, w: 160, h: 80 } as SquigNode,
+  ])
+  const locked = updateNode(doc, "t", { locked: true })
+  check("locking a label leaves its box alone", locked.nodes.t.w === 160 && locked.nodes.t.h === 80)
+  const reworded = updateNode(doc, "t", { text: "Hello there" } as Partial<SquigNode>)
+  check("…while new words re-fit it", reworded.nodes.t.w !== 160)
+  const long = "y".repeat(80)
+  check("an eighty-character id is welcome", addNodes(emptyDoc("ids"), [shapeNode("rect", { x: 0, y: 0, w: 1, h: 1, id: long, seed: 1 })]).order[0] === long)
+}
+
 report("document checks passed")

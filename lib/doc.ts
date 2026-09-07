@@ -51,7 +51,7 @@ export interface SquigDocument extends SquigDoc {
 export class DocError extends Error {}
 
 /** Short and URL-safe, like the ids the app mints; a caller may bring its own. */
-const ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/
+const ID_PATTERN = /^[A-Za-z0-9_-]{1,80}$/
 /** Names a plain object already answers to — as a key they'd reach the prototype. */
 const RESERVED_IDS = new Set(["__proto__", "constructor", "prototype"])
 /** A picture is raster: an SVG data URL can carry script, and nothing here needs one. */
@@ -360,7 +360,7 @@ export function vouchNode(raw: unknown): SquigNode {
   const n = validNode({ ...(raw as object) })
   if (!n) throw new DocError(`not a node squig can draw: ${describe(raw)}`)
   if (!ID_PATTERN.test(n.id) || RESERVED_IDS.has(n.id)) {
-    throw new DocError(`"${n.id}" isn't a usable id (letters, digits, - and _, up to 64)`)
+    throw new DocError(`"${n.id}" isn't a usable id (letters, digits, - and _, up to 80)`)
   }
   if ([n.x, n.y, n.w, n.h].some((v) => Math.abs(v) > MAX_COORD)) {
     throw new DocError(`node "${n.id}" is off the sheet — keep coordinates within ±${MAX_COORD}`)
@@ -446,13 +446,42 @@ export function addNodes(doc: SquigDocument, nodes: readonly SquigNode[]): Squig
   return { ...doc, nodes: settleBinds(pruneDegenerateGroups(map)), order }
 }
 
+/** The keys whose change means a text layer's box has to be measured again. */
+const TEXT_LAYOUT_KEYS: ReadonlySet<string> = new Set(["text", "fontSize", "bold", "italic", "boxed", "w", "fixedW", "fixedH"])
+
 /**
- * Change one node. A text layer keeps its box honest: new words, a new size
- * or a new measure re-fit the box the way the inline editor would. A
- * component's props merge, so setting the label keeps the variant. The
- * document that comes back may have changed neighbours too — a group left
- * with one member dissolves, and bound arrows follow a moved box — so read
- * the whole node map, not just the node you named.
+ * One node with a patch on it, vouched. A text layer keeps its box honest
+ * when the patch touches its words or its measure — new words, a new size,
+ * a new width re-fit the box the way the inline editor would — and keeps
+ * its box as it was for anything else, so locking or moving a label never
+ * re-lays it out. A component's props merge, so setting the label keeps the
+ * variant. This is the node half of updateNode; a caller building a batch
+ * of its own applies it per node and settles the document once at the end.
+ */
+export function patchNode(node: SquigNode, patch: Partial<SquigNode>, measureText?: TextMeasurer): SquigNode {
+  if ("type" in patch && patch.type !== node.type) throw new DocError(`a ${node.type} can't become a ${patch.type}`)
+  let merged: SquigNode
+  if (node.type === "text") {
+    const { text, fontSize, ...rest } = patch as Partial<TextNode>
+    const base: TextNode = { ...node, ...rest, ...(rest.w !== undefined ? { fixedW: true } : {}) }
+    const relaid = Object.keys(patch).some((k) => TEXT_LAYOUT_KEYS.has(k))
+    merged = relaid
+      ? { ...base, ...fitTextBox(base, text ?? node.text, fontSize ?? node.fontSize, measureText) }
+      : { ...base, text: text ?? node.text, fontSize: fontSize ?? node.fontSize }
+  } else if (node.type === "component") {
+    const { props, ...rest } = patch as Partial<ComponentNode>
+    merged = { ...node, ...rest, ...(props ? { props: { ...node.props, ...props } } : {}) }
+  } else {
+    merged = { ...node, ...patch } as SquigNode
+  }
+  return vouchNode({ ...merged, id: node.id })
+}
+
+/**
+ * Change one node in a document. The document that comes back may have
+ * changed neighbours too — a group left with one member dissolves, and bound
+ * arrows follow a moved box — so read the whole node map, not just the node
+ * you named.
  */
 export function updateNode(
   doc: SquigDocument,
@@ -462,19 +491,7 @@ export function updateNode(
 ): SquigDocument {
   const node = doc.nodes[id]
   if (!node) throw new DocError(`no node called "${id}"`)
-  if ("type" in patch && patch.type !== node.type) throw new DocError(`a ${node.type} can't become a ${patch.type}`)
-  let merged: SquigNode
-  if (node.type === "text") {
-    const { text, fontSize, ...rest } = patch as Partial<TextNode>
-    const base: TextNode = { ...node, ...rest, ...(rest.w !== undefined ? { fixedW: true } : {}) }
-    merged = { ...base, ...fitTextBox(base, text ?? node.text, fontSize ?? node.fontSize, measureText) }
-  } else if (node.type === "component") {
-    const { props, ...rest } = patch as Partial<ComponentNode>
-    merged = { ...node, ...rest, ...(props ? { props: { ...node.props, ...props } } : {}) }
-  } else {
-    merged = { ...node, ...patch } as SquigNode
-  }
-  const next = vouchNode({ ...merged, id })
+  const next = patchNode(node, patch, measureText)
   return { ...doc, nodes: settleBinds(pruneDegenerateGroups({ ...doc.nodes, [id]: next })) }
 }
 

@@ -11,13 +11,7 @@
 // ---------------------------------------------------------------------------
 
 import { isDeepStrictEqual } from "node:util"
-import {
-  applyOperations,
-  cleanNode,
-  diffNodes,
-  emptyDocument,
-  validateDocument,
-} from "../lib/agent/engine.ts"
+import { applyOperations, cleanNode, diffNodes, emptyDocument, validateDocument, AgentError, type CanvasDocument } from "../lib/agent/engine.ts"
 import { renderPng, renderSvg, pngDocument } from "../lib/agent/render.ts"
 import { operation } from "../lib/agent/schema.ts"
 import { ALL_DEFS } from "../lib/library/registry.ts"
@@ -774,5 +768,71 @@ check(
 )
 
 // ---------------------------------------------------------------------------
+
+// -- a batch is one edit: invariants hold at the end, not between steps ----
+
+{
+  const ops = (list: unknown[]) => operation.array().parse(list)
+  const status = (fn: () => unknown) => {
+    try {
+      fn()
+      return null
+    } catch (e) {
+      return e instanceof AgentError ? e.status : "threw"
+    }
+  }
+  const two = applyOperations(
+    emptyDocument("batch"),
+    ops([
+      { op: "add", nodes: [{ id: "p", type: "shape", x: 0, y: 0, w: 40, h: 40 }] },
+      {
+        op: "add",
+        nodes: [
+          { id: "link", type: "arrow", x: 0, y: 0, w: 10, h: 10, points: [[0, 0], [10, 10]], head: true, bind: ["p", "q"] },
+        ],
+      },
+      { op: "add", nodes: [{ id: "q", type: "shape", x: 200, y: 0, w: 40, h: 40 }] },
+    ]),
+  ).document
+  check("an arrow may name a box a later add brings", same(two.nodes.link.type === "arrow" && two.nodes.link.bind, ["p", "q"]))
+
+  const paired = applyOperations(
+    two,
+    ops([{ op: "update", patches: [{ id: "p", patch: { groupIds: ["g9"] } }, { id: "q", patch: { groupIds: ["g9"] } }] }]),
+  ).document
+  check("two patches can found a group between them", same(paired.nodes.p.groupIds, ["g9"]) && same(paired.nodes.q.groupIds, ["g9"]))
+
+  const labelled = applyOperations(
+    two,
+    ops([{ op: "add", nodes: [{ id: "t", type: "text", x: 0, y: 100, w: 160, h: 80, text: "Hi", fontSize: 20, align: "center" }] }]),
+  ).document
+  const lockedLabel = applyOperations(labelled, ops([{ op: "update", patches: [{ id: "t", patch: { locked: true } }] }])).document
+  check("locking a label leaves its box alone", lockedLabel.nodes.t.w === 160 && lockedLabel.nodes.t.x === 0)
+
+  const words = "Wide words wrap here and keep going for a while yet"
+  const hand = applyOperations(emptyDocument("faces"), ops([{ op: "note", x: 0, y: 0, w: 200, text: words }])).document
+  const sans = applyOperations(
+    emptyDocument("faces"),
+    ops([{ op: "look", font: "sans" }, { op: "note", x: 0, y: 0, w: 200, text: words }]),
+  ).document
+  const height = (doc: CanvasDocument) => doc.nodes[doc.order[0]].h
+  check("a note after a look change measures with the new face", height(hand) !== height(sans))
+
+  check("words that aren't a string are a 400, not a crash", status(() => applyOperations(two, ops([{ op: "update", patches: [{ id: "p", patch: { text: 123 } }] }]))) === 400)
+  check("a negative width in a patch is a 400", status(() => applyOperations(two, ops([{ op: "update", patches: [{ id: "p", patch: { w: -5 } }] }]))) === 400)
+
+  const long = "x".repeat(80)
+  check("an eighty-character id is still welcome", status(() => applyOperations(two, ops([{ op: "add", nodes: [{ id: long, type: "shape", x: 0, y: 0, w: 1, h: 1 }] }]))) === null)
+
+  const withButton = applyOperations(
+    two,
+    ops([
+      { op: "add", nodes: [{ id: "btn", type: "component", kind: "button", x: 0, y: 300 }] },
+      { op: "group", ids: ["btn", "q"], groupId: "pair" },
+    ]),
+  ).document
+  const detached = applyOperations(withButton, ops([{ op: "detach", ids: ["btn"] }])).document
+  check("detaching a grouped component keeps its sibling in the group", same(detached.nodes.q.groupIds, ["pair"]))
+}
 
 report(`agent engine checks passed (${ALL_DEFS.length} library definitions)`)

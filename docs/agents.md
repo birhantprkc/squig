@@ -106,7 +106,7 @@ squig.selection()                  // the ids currently selected
 squig.zoomToFit()
 squig.zoomTo(ids)
 squig.bounds()                     // the world box the drawing covers
-squig.components(query)            // the same index as list_components
+squig.components(query)            // the same index as `pnpm squig components`
 squig.describe(kind)
 squig.svg(ids)                     // markup for those nodes, or the whole sheet
 ```
@@ -145,8 +145,9 @@ node --experimental-strip-types --import ./scripts/register-loader.mjs yourfile.
 
 ## How to draw well
 
-The loop: **list, describe, place, render, look, adjust.** `list_components`
-before you invent a component that already exists, `describe_component` before
+The loop: **list, describe, place, render, look, adjust.** List the library
+(`pnpm squig components`, `squig_catalog`, `squig.components()`) before you
+invent a component that already exists, describe the one you picked before
 you guess at a prop name, then place things at their default sizes, render the
 SVG, and actually read it before you say you are done. A wireframe you have not
 looked at is a guess.

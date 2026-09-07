@@ -55,7 +55,9 @@ the browser.
 
 ## Style
 
-Match the file you're in. A few conventions worth knowing:
+Match the file you're in. [AGENTS.md](AGENTS.md) is the short version of how
+this repo works — the map, the gate, and where the big files come apart. A few
+conventions worth knowing:
 
 - Comments explain *why*, not what. Most of the codebase's comments are there
   because a decision would look arbitrary otherwise — keep that bar.

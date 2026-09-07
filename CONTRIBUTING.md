@@ -17,12 +17,13 @@ documents live in the browser's own storage.
 Before you push:
 
 ```bash
-pnpm lint
-pnpm test     # type-checks, then runs the geometry, selection and clipboard suites
-pnpm build
+pnpm verify   # lint, then test, then build
 ```
 
-All three should be green before you open a pull request.
+`pnpm test` on its own type-checks and runs every suite under
+`scripts/test-*.ts`; pass names to narrow it while you work, as in
+`pnpm test crop text`. All three steps should be green before you open a pull
+request.
 
 ## The easiest thing to contribute
 

@@ -39,14 +39,7 @@ const held = new Map<string, string>()
 const { useSquig } = await import("../lib/store.ts")
 const { nodePrims } = await import("../lib/sketch/node-prims.ts")
 import type { ImageNode, SquigNode } from "../lib/types.ts"
-
-let passed = 0
-const failures: string[] = []
-
-function check(name: string, cond: boolean, detail = "") {
-  if (cond) passed++
-  else failures.push(`${name}${detail ? ` — ${detail}` : ""}`)
-}
+import { check, report } from "./harness.ts"
 
 const s = () => useSquig.getState()
 
@@ -347,9 +340,4 @@ const docJson = () => JSON.stringify({ nodes: s().nodes, order: s().order })
 
 // ---------------------------------------------------------------------------
 
-if (failures.length) {
-  console.error(`\n✗ ${failures.length} failed, ${passed} passed\n`)
-  for (const f of failures) console.error("  ✗ " + f)
-  process.exit(1)
-}
-console.log(`✓ ${passed} history checks passed`)
+report("history checks passed")

@@ -11,14 +11,7 @@ import { resizeBounds, resizeNodesBy, scaleNodes, MIN_SIZE, type Handle } from "
 import { hitsInterior, hitsPoint, hitsRect, pickAt, pickInRect, pickSoftAt, pickTolerance } from "../lib/canvas/hit-test.ts"
 import { repeatStep } from "../lib/canvas/duplicate.ts"
 import type { SquigNode } from "../lib/types.ts"
-
-let passed = 0
-const failures: string[] = []
-
-function check(name: string, cond: boolean, detail = "") {
-  if (cond) passed++
-  else failures.push(`${name}${detail ? ` — ${detail}` : ""}`)
-}
+import { check, report } from "./harness.ts"
 
 function close(a: number, b: number, eps = 1e-6) {
   return Math.abs(a - b) <= eps
@@ -460,9 +453,4 @@ const apply = (ns: SquigNode[], patches: Record<string, Partial<SquigNode>>): Sq
 
 // ---------------------------------------------------------------------------
 
-if (failures.length) {
-  console.error(`\n✗ ${failures.length} failed, ${passed} passed\n`)
-  for (const f of failures) console.error("  ✗ " + f)
-  process.exit(1)
-}
-console.log(`✓ ${passed} geometry checks passed`)
+report("geometry checks passed")

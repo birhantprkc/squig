@@ -16,14 +16,7 @@
 import { hitsPoint, pickAt, pickInRect, pickSoftAt } from "../lib/canvas/hit-test.ts"
 import { isLocked, lockedIds, selectable } from "../lib/selection.ts"
 import type { SquigNode } from "../lib/types.ts"
-
-let passed = 0
-const failures: string[] = []
-
-function check(name: string, cond: boolean, detail = "") {
-  if (cond) passed++
-  else failures.push(`${name}${detail ? ` — ${detail}` : ""}`)
-}
+import { check, report } from "./harness.ts"
 
 /** A filled rectangle — solid to the pointer everywhere inside it. */
 function rect(id: string, x: number, y: number, w: number, h: number, locked?: boolean): SquigNode {
@@ -121,9 +114,4 @@ check("nothing at all isn't locked", !isLocked(undefined) && !isLocked(null))
 
 // ---------------------------------------------------------------------------
 
-if (failures.length) {
-  console.error(`\n✗ ${failures.length} failed, ${passed} passed\n`)
-  for (const f of failures) console.error("  ✗ " + f)
-  process.exit(1)
-}
-console.log(`✓ ${passed} lock checks passed`)
+report("lock checks passed")

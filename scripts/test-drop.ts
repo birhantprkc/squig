@@ -10,13 +10,7 @@
 // ---------------------------------------------------------------------------
 
 import { layoutDrop, planDrop, type DropSize, type DroppedFile } from "../lib/canvas/drop.ts"
-
-let passed = 0
-const failures: string[] = []
-const check = (name: string, cond: boolean, detail = "") => {
-  if (cond) passed++
-  else failures.push(`${name}${detail ? ` — ${detail}` : ""}`)
-}
+import { check, report } from "./harness.ts"
 
 function file(name: string, type = ""): DroppedFile {
   return { name, type }
@@ -102,9 +96,4 @@ function box(w = 200, h = 100): DropSize {
 
 // ---------------------------------------------------------------------------
 
-if (failures.length) {
-  console.error(`\n✗ ${failures.length} failed, ${passed} passed\n`)
-  for (const f of failures) console.error("  ✗ " + f)
-  process.exit(1)
-}
-console.log(`✓ ${passed} drop checks passed`)
+report("drop checks passed")

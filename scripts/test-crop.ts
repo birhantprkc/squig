@@ -25,14 +25,7 @@ import {
 import { resizeBounds, MIN_SIZE, type Handle } from "../lib/canvas/transform.ts"
 import { cropOf, normalizeCrop, type ImageCrop, type ImageNode, type SquigNode } from "../lib/types.ts"
 import type { Bounds } from "../lib/selection.ts"
-
-let passed = 0
-const failures: string[] = []
-
-function check(name: string, cond: boolean, detail = "") {
-  if (cond) passed++
-  else failures.push(`${name}${detail ? ` — ${detail}` : ""}`)
-}
+import { check, report } from "./harness.ts"
 
 const close = (a: number, b: number, eps = 1e-6) => Math.abs(a - b) <= eps
 
@@ -614,9 +607,4 @@ for (const [what, run] of leaves) {
 
 // ---------------------------------------------------------------------------
 
-if (failures.length) {
-  console.error(`\n✗ ${failures.length} failed, ${passed} passed\n`)
-  for (const f of failures) console.error("  ✗ " + f)
-  process.exit(1)
-}
-console.log(`✓ ${passed} crop checks passed`)
+report("crop checks passed")

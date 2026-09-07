@@ -16,14 +16,7 @@
 import { ALL_DEFS, type ComponentDef } from "../lib/library/registry.ts"
 import type { Prim } from "../lib/sketch/kit.ts"
 import { resolveIconName } from "../lib/sketch/icons.ts"
-
-let passed = 0
-const failures: string[] = []
-
-function check(name: string, cond: boolean, detail = "") {
-  if (cond) passed++
-  else failures.push(`${name}${detail ? ` — ${detail}` : ""}`)
-}
+import { check, report } from "./harness.ts"
 
 // -- reading a prim ---------------------------------------------------------
 
@@ -250,9 +243,4 @@ for (const def of phones) {
 
 // ---------------------------------------------------------------------------
 
-if (failures.length) {
-  console.error(`\n✗ ${failures.length} failed, ${passed} passed\n`)
-  for (const f of failures) console.error("  ✗ " + f)
-  process.exit(1)
-}
-console.log(`✓ ${passed} def checks passed across ${ALL_DEFS.length} components`)
+report(`def checks passed across ${ALL_DEFS.length} components`)

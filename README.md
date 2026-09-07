@@ -83,9 +83,10 @@ pnpm dev
 ```
 
 No environment variables, no database, no accounts — documents live in the
-browser's own storage. `pnpm test` type-checks and runs the geometry,
-selection and clipboard suites; `pnpm lint` and `pnpm build` are the other two
-worth running before you push.
+browser's own storage. `pnpm test` type-checks and runs every suite under
+`scripts/test-*.ts`, and `pnpm test crop text` runs just the ones whose names
+match. `pnpm verify` is lint, test and build in one go — the thing to run
+before you push.
 
 ## How it's put together
 

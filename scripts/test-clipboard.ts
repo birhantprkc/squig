@@ -18,13 +18,7 @@ import {
   wordsOf,
 } from "../lib/clipboard-payload.ts"
 import type { ImageNode, ShapeNode, SquigNode, TextNode } from "../lib/types.ts"
-
-let passed = 0
-const failures: string[] = []
-const check = (name: string, cond: boolean, detail = "") => {
-  if (cond) passed++
-  else failures.push(`${name}${detail ? ` — ${detail}` : ""}`)
-}
+import { check, report } from "./harness.ts"
 
 const rect = (id: string, x = 0, y = 0): ShapeNode => ({
   id,
@@ -126,9 +120,4 @@ function pic(src: string): ImageNode {
 
 // ---------------------------------------------------------------------------
 
-if (failures.length) {
-  console.error(`\n✗ ${failures.length} failed, ${passed} passed\n`)
-  for (const f of failures) console.error("  ✗ " + f)
-  process.exit(1)
-}
-console.log(`✓ ${passed} clipboard checks passed`)
+report("clipboard checks passed")

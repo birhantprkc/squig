@@ -19,13 +19,7 @@ import {
 } from "../lib/selection.ts"
 import { REGISTRY } from "../lib/library/registry.ts"
 import type { ComponentNode, SquigNode } from "../lib/types.ts"
-
-let passed = 0
-const failures: string[] = []
-const check = (name: string, cond: boolean, detail = "") => {
-  if (cond) passed++
-  else failures.push(`${name}${detail ? ` — ${detail}` : ""}`)
-}
+import { check, report } from "./harness.ts"
 
 const comp = (id: string, kind: string, props: Record<string, unknown> = {}): ComponentNode => ({
   id,
@@ -141,7 +135,7 @@ check("an empty selection reads as mixed", shared([]).mixed === true)
   if (disjoint) {
     check("kinds with nothing in common share nothing", sharedControls([comp("a", disjoint[0]), comp("b", disjoint[1])]).length === 0, disjoint.join(" + "))
   } else {
-    passed++ // no disjoint pair in this registry; nothing to assert
+    check("no disjoint pair in this registry, so nothing to assert", true)
   }
 }
 
@@ -162,7 +156,7 @@ check("an empty selection reads as mixed", shared([]).mixed === true)
     const out = sharedControls([comp("a", clash[0]), comp("b", clash[1])])
     check("a key with clashing types is dropped", !out.some((c) => c.key === clash[2]), clash.join(" / "))
   } else {
-    passed++ // registry has no type clashes today
+    check("no clashing control types in this registry, so nothing to assert", true)
   }
 }
 
@@ -208,9 +202,4 @@ check("an empty selection reads as mixed", shared([]).mixed === true)
 
 // ---------------------------------------------------------------------------
 
-if (failures.length) {
-  console.error(`\n✗ ${failures.length} failed, ${passed} passed\n`)
-  for (const f of failures) console.error("  ✗ " + f)
-  process.exit(1)
-}
-console.log(`✓ ${passed} selection checks passed`)
+report("selection checks passed")

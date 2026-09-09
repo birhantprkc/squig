@@ -412,8 +412,13 @@ try {
             fontSize: 32,
             text: "Already on my canvas",
           },
+          logo: {
+            id: "logo", type: "image", x: 0, y: 140, w: 240, h: 120,
+            naturalW: 240, naturalH: 120, seed: 1, name: "Legacy SVG",
+            src: `data:image/svg+xml;base64,${Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="240" height="120"><rect width="240" height="120" fill="#333"/></svg>').toString("base64")}`,
+          },
         },
-        order: ["existing"],
+        order: ["existing", "logo"],
       }),
     ),
   })
@@ -438,6 +443,15 @@ try {
     (await api(`documents/${attachedId}`)).document.nodes.existing.text,
   ).toBe("Already on my canvas")
   await expect(local.locator(".agent-sync")).toHaveAttribute("data-connected", "true")
+  const attached = await api(`documents/${attachedId}`)
+  expect(attached.document.nodes.logo.src).toMatch(/^data:image\/(png|webp);base64,/)
+  expect(attached.document.nodes.logo.w).toBe(240)
+  await api("tools/edit_document", {
+    documentId: attachedId,
+    revision: attached.revision,
+    operations: [{ op: "add", nodes: [{ id: "agent_reply", type: "text", x: 0, y: 300, text: "Agent joined this canvas", fontSize: 24 }] }],
+  })
+  await expect(local.getByText("Agent joined this canvas", { exact: true }).first()).toBeVisible({ timeout: 15000 })
   const idleRevision = (await api(`documents/${attachedId}`)).revision
   let idlePolls = 0
   const countIdlePoll = (request) => {
@@ -534,7 +548,7 @@ try {
   await mkdir("test-results", { recursive: true })
   await page.screenshot({ path: "test-results/agent-connect-mobile.png" })
   console.log(
-    "✓ Browser workflow passed: direct canvas invitation, scoped connection, visible editable wireframes, human edits, remote sync, genuine conflict, draft recovery, SEO and mobile layouts; no page errors.",
+    "✓ Browser workflow passed: direct canvas invitation, legacy SVG sharing, agent joins and draws, scoped connection, visible editable wireframes, human edits, remote sync, genuine conflict, draft recovery, SEO and mobile layouts; no page errors.",
   )
 } finally {
   await browser.close()

@@ -77,6 +77,29 @@ retained for migration compatibility; no review interface or endpoint is
 exposed. Database backups, retention and operating budgets belong to the host.
 The Webxdc package keeps the offline canvas and excludes hosted connections.
 
+Before promoting a deployment, run `pnpm db:check` with that deployment's
+`DATABASE_URL` and database role. It is a read-only preflight: required columns
+in all five tables, table privileges and the nullable `review_hash` upgrade.
+It emits JSON and exits nonzero when storage is not ready. Run `pnpm db:migrate`
+and repeat the check for a schema failure. Both commands accept environment
+variables directly and optionally load `.env.local`. They are intentionally
+separate from ordinary local builds: the editor and offline package need no database.
+The REST/MCP preview smoke suite remains the check for actual writes.
+
+Vercel's build command is `pnpm build:hosted`: migrate, check readiness, then
+build. Schema upgrades happen automatically before the new deployment can
+receive traffic. A missing database or failed migration stops the deployment;
+so that release cannot replace the working live site. Other
+hosts can use the same command. Keep migrations additive and compatible with
+the currently serving release. Runtime requests never run migrations.
+
+REST and MCP return sanitized 503 diagnostics with stable `AGENT_STORAGE_*`
+codes for missing configuration, migration, permissions and availability.
+Database error text, credentials and query details are never returned or logged.
+Failed connections retain the local canvas and show a retry action. Legacy SVG
+images are rasterized in the browser for sharing; failed uploads leave the
+local document unchanged. Newly pasted SVGs are also stored as raster images.
+
 ## Verification
 
 Run `pnpm test`, `pnpm test:agent`, `pnpm lint`, `pnpm build` and `make build-xdc`.
@@ -84,3 +107,9 @@ With the app running and DATABASE_URL loaded, run the real REST/MCP integration
 suite and `pnpm test:agent:browser`. These create isolated fixtures and clean
 them up. Browser coverage includes direct invitations, existing local files,
 two live editors, independent concurrent writes and conflicting draft recovery.
+
+For rollout regressions without a database, start `DATABASE_URL='' pnpm dev
+--port 3011`, then run `pnpm test:agent:rollout`. This checks the real missing
+configuration response, then uses isolated HTTP fixtures for an unmigrated
+database and recovery. It covers retry, preserved local editing, legacy SVG
+sharing and SVG paste. Screenshots are saved under `test-results/agent-rollout`.

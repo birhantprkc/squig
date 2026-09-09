@@ -4,6 +4,7 @@ import { useCanvasSyncIssue } from "@/lib/agent/sync-status"
 import { useSquig } from "@/lib/store"
 import { agentRequest, KEY_STORAGE } from "@/lib/agent/client"
 import { agentInvite, mcpConfig } from "@/lib/agent/invite"
+import { prepareCanvas, applyPreparedImages } from "@/lib/agent/prepare-canvas"
 import { unionBox } from "@/lib/types"
 import { nodeVisualBounds } from "@/lib/canvas/line-routing"
 import { fitViewport } from "@/lib/canvas/navigate"
@@ -58,6 +59,8 @@ export function AgentBridge({ hidden = false }: { hidden?: boolean }) {
     id: "",
   })
   const [reload, setReload] = useState(0)
+  const [connectError, setConnectError] = useState("")
+  const [connectBusy, setConnectBusy] = useState(false)
   useEffect(() => {
     const id = new URLSearchParams(location.search).get("agent")
     if (!id) return
@@ -282,9 +285,15 @@ export function AgentBridge({ hidden = false }: { hidden?: boolean }) {
   async function connect() {
     if (credentials.key || connecting.current) return
     connecting.current = true
+    setConnectBusy(true)
+    setConnectError("")
+    clearIssue()
+    setStatus("Connecting this canvas…")
     const sourceId = useSquig.getState().docId
-    const doc = JSON.parse(useSquig.getState().serialize())
     try {
+      const original = JSON.parse(useSquig.getState().serialize())
+      const doc = await prepareCanvas(original)
+      if (useSquig.getState().docId !== sourceId) return
       let key = localStorage.getItem(KEY_STORAGE)
       if (!key) {
         const workspace = await agentRequest("workspaces", "", {
@@ -323,6 +332,13 @@ export function AgentBridge({ hidden = false }: { hidden?: boolean }) {
       })
       localStorage.setItem(canvasStorage(created.id), created.canvasKey)
       if (useSquig.getState().docId !== sourceId) return
+      // Undo must not reintroduce a legacy SVG into the connected document.
+      const state = useSquig.getState()
+      useSquig.setState({
+        nodes: applyPreparedImages(state.nodes, original, doc),
+        past: state.past.map((frame) => ({ ...frame, nodes: applyPreparedImages(frame.nodes, original, doc) })),
+        future: state.future.map((frame) => ({ ...frame, nodes: applyPreparedImages(frame.nodes, original, doc) })),
+      })
       attaching.current = created.id
       history.pushState(null, "", `/?agent=${created.id}`)
       setCredentials({
@@ -332,10 +348,14 @@ export function AgentBridge({ hidden = false }: { hidden?: boolean }) {
       })
       setReload((v) => v + 1)
     } catch (e) {
-      if (useSquig.getState().docId === sourceId)
-        reportIssue((e as Error).message)
+      if (useSquig.getState().docId === sourceId) {
+        const message = (e as Error).message
+        setConnectError(message)
+        reportIssue("Could not connect this canvas. Open Connect agent to try again.")
+      }
     } finally {
       connecting.current = false
+      setConnectBusy(false)
       if (useSquig.getState().docId !== sourceId) {
         setPanel(null)
         setStatus("")
@@ -420,7 +440,18 @@ export function AgentBridge({ hidden = false }: { hidden?: boolean }) {
                     />
                   )
                 ) : (
-                  <p role="status">{status || "Preparing canvas…"}</p>
+                  <>
+                    <p role={connectError ? "alert" : "status"}>{connectError || status || "Preparing canvas…"}</p>
+                    {connectError && (
+                      <>
+                        <p>Your local canvas is still available to edit and save.</p>
+                        <button type="button" className="agent-invite-copy" disabled={connectBusy} onClick={() => void connect()}>
+                          {connectBusy ? "Connecting…" : "Try again"}
+                        </button>
+                        <a href="/docs/self-hosting" target="_blank" rel="noreferrer">Operator setup guide</a>
+                      </>
+                    )}
+                  </>
                 )}
               </Popover.Popup>
             </Popover.Positioner>

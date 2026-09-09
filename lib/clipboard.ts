@@ -119,10 +119,24 @@ function supportsWebp(): boolean {
 function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image()
-    img.onload = () => resolve(img)
-    img.onerror = () => reject(new Error("image failed to load"))
+    const timer = setTimeout(() => {
+      img.src = ""
+      reject(new Error("image took too long to load"))
+    }, 10_000)
+    img.onload = () => { clearTimeout(timer); resolve(img) }
+    img.onerror = () => { clearTimeout(timer); reject(new Error("image failed to load")) }
     img.src = src
   })
+}
+
+/** SVGs stay in an image context; never insert their markup into the page. */
+export async function rasterizeImageSource(src: string): Promise<string> {
+  const img = await loadImage(src)
+  const nw = img.naturalWidth || img.width, nh = img.naturalHeight || img.height
+  if (!nw || !nh) throw new Error("image has no dimensions")
+  const raster = reencode(img, nw, nh, "image/svg+xml")
+  if (!raster) throw new Error("image could not be converted")
+  return raster
 }
 
 function blobToDataUrl(blob: Blob): Promise<string> {
@@ -186,7 +200,8 @@ export async function imageNodeFrom(blob: Blob, name?: string): Promise<ImageNod
     // small enough already: keep the original bytes rather than re-encoding
     // them. That's what keeps a crisp UI screenshot crisp — and an animated
     // GIF animated, since a redraw would flatten it to its first frame
-    const asIs = blob.size <= KEEP_ORIGINAL_BYTES && Math.max(nw, nh) <= MAX_EDGE
+    const asIs = /^image\/(png|jpeg|webp|gif)$/i.test(blob.type) &&
+      blob.size <= KEEP_ORIGINAL_BYTES && Math.max(nw, nh) <= MAX_EDGE
     const src = asIs ? await blobToDataUrl(blob) : reencode(img, nw, nh, blob.type)
     if (!src) return null
 

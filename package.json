@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:hosted": "pnpm db:migrate && pnpm db:check && pnpm build",
     "build:xdc": "make build-xdc",
     "start": "next start",
     "squig": "node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/register-loader.mjs scripts/squig.ts",
@@ -15,7 +16,9 @@
     "test:agent": "node --experimental-strip-types --import ./scripts/register-loader.mjs scripts/test.ts agent",
     "test:agent:integration": "node scripts/agent/smoke.mjs",
     "test:agent:browser": "node --env-file=.env.local scripts/agent/browser.mjs",
-    "db:migrate": "node --env-file=.env.local scripts/agent/migrate.mjs",
+    "test:agent:rollout": "node scripts/agent/rollout-browser.mjs",
+    "db:migrate": "node --env-file-if-exists=.env.local scripts/agent/migrate.mjs",
+    "db:check": "node --env-file-if-exists=.env.local --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/register-loader.mjs scripts/agent/check.ts",
     "verify": "pnpm lint && pnpm test && pnpm build",
     "bench:history": "node --expose-gc --experimental-strip-types --import ./scripts/register-loader.mjs scripts/bench-history.ts",
     "gen:icons": "node scripts/gen-icons.mjs",

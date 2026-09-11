@@ -1,5 +1,6 @@
 import { ZodError } from "zod"
 import { AgentError } from "./engine"
+import { storageFailure } from "./storage"
 export const headers = {
   "Cache-Control": "no-store",
   "X-Content-Type-Options": "nosniff",
@@ -9,13 +10,18 @@ export function json(value: unknown, status = 200) {
   return Response.json(value, { status, headers })
 }
 export function failure(error: unknown) {
+  const storage = storageFailure(error)
+  if (storage) {
+    console.error("Agent storage unavailable", storage.code)
+    return json({ error: storage.message, code: storage.code }, storage.status)
+  }
   if (error instanceof ZodError)
     return json({ error: "Invalid input", details: error.issues }, 400)
   if (error instanceof AgentError)
     return json({ error: error.message }, error.status)
   console.error(
     "Agent request failed",
-    error instanceof Error ? error.message : "Unknown error",
+    "Unexpected internal error",
   )
   return json(
     {

@@ -210,11 +210,16 @@ export const pages: DocPage[] = [
       {
         title: "Install and migrate",
         text: "Create a Neon database through the Vercel Marketplace or your own Neon account. Set DATABASE_URL in .env.local. Set SQUIG_PUBLIC_URL to the public origin of your instance (http://localhost:3000 for local development). The app uses this value for returned canvas links. Keep secrets out of NEXT_PUBLIC_ variables.",
-        code: "pnpm install --frozen-lockfile\nnode --env-file=.env.local scripts/agent/migrate.mjs\npnpm dev",
+        code: "pnpm install --frozen-lockfile\npnpm db:migrate\npnpm db:check\npnpm dev",
       },
       {
         title: "Deployment",
-        text: "Run the additive, idempotent migration before serving traffic. On Vercel, connect the database integration to the deployment environments and configure SQUIG_PUBLIC_URL. Run pnpm test, pnpm test:agent, pnpm lint and pnpm build. Verify a preview with the MCP integration smoke test before promoting it. All API and MCP routes use the Node.js runtime. Back up the database and set retention/budget policies suitable for your instance.",
+        text: "Vercel runs pnpm build:hosted: the additive, idempotent migration, then the readiness check, then the app build. This prepares the schema before the deployment can receive traffic; missing storage or a failed migration stops that deployment. Connect the database integration to the deployment environments and configure SQUIG_PUBLIC_URL. Other hosts should also use pnpm build:hosted. Run pnpm test, pnpm test:agent and pnpm lint, then verify a preview with the MCP integration smoke test before promoting it. The ordinary pnpm build and Webxdc package remain database-free. All API and MCP routes use the Node.js runtime. Back up the database and set retention/budget policies suitable for your instance.",
+      },
+      {
+        title: "Readiness before promotion",
+        text: "Run pnpm db:check with the exact DATABASE_URL and database role used by the target deployment. It reads schema metadata without creating workspaces, consuming signup quotas or changing documents. It checks connectivity, required columns in all five agent tables, table permissions, and the nullable review_hash upgrade. It prints ready: true and exits zero on success; failures exit nonzero with a stable diagnostic code and an operator action. Both db commands accept an injected DATABASE_URL without .env.local; an existing environment variable takes precedence over that file. A passing ordinary build does not prove database readiness. Hosted builds include the check; ordinary local builds and Webxdc remain usable without hosted storage. After the check, run the REST/MCP smoke suite on a preview to verify actual writes before promoting it.",
+        code: "pnpm db:check\n# If AGENT_STORAGE_SCHEMA is reported:\npnpm db:migrate\npnpm db:check",
       },
       {
         title: "Storage and access",

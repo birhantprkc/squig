@@ -1,17 +1,21 @@
 import { neon } from "@neondatabase/serverless"
 import { createHash, randomBytes } from "node:crypto"
 import { AgentError, type CanvasDocument } from "./engine"
+import { StorageError } from "./storage"
 
 export const token = () => randomBytes(32).toString("base64url")
 export const hash = (value: string) =>
   createHash("sha256").update(value).digest("hex")
 export function db() {
-  if (!process.env.DATABASE_URL)
-    throw new AgentError(
-      503,
-      "Agent storage is not configured. See /docs/self-hosting.",
-    )
-  return neon(process.env.DATABASE_URL)
+  if (!process.env.DATABASE_URL?.trim())
+    throw new StorageError("AGENT_STORAGE_UNCONFIGURED")
+  try {
+    return neon(process.env.DATABASE_URL, {
+      fetchOptions: { signal: AbortSignal.timeout(10_000) },
+    })
+  } catch {
+    throw new StorageError("AGENT_STORAGE_UNAVAILABLE")
+  }
 }
 export interface StoredDocument {
   id: string

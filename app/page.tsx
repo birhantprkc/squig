@@ -68,7 +68,7 @@ export default function Home() {
         </>
       )}
       {uiHidden && (
-        <p className="pointer-events-none absolute right-4 bottom-4 z-30 font-mono text-[10px] text-muted-foreground/60">
+        <p className="pointer-events-none absolute right-4 bottom-4 z-30 font-sans text-micro text-muted-foreground">
           {kbd("mod+\\")}
         </p>
       )}

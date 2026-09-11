@@ -8,7 +8,7 @@
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
   --font-heading: var(--font-sans);
   --font-sketch: var(--font-sketch), "Patrick Hand", "Comic Sans MS", cursive;
   --font-serif: var(--font-serif), "Source Serif 4", ui-serif, Georgia, serif;
@@ -69,29 +69,28 @@
   --radius-chrome-lg: 10px; /* floating panels and menus */
 
   /* Control height. `sm` is only for controls nested inside another control. */
-  --spacing-ctl-sm: 26px;
-  --spacing-ctl: 32px;
-  --spacing-ctl-lg: 36px;
+  --spacing-ctl-sm: 28px;
+  --spacing-ctl: 36px;
+  --spacing-ctl-lg: 40px;
 
-  /* Chrome type. Four sizes and that is the whole scale: a hint, a
-     label-or-value, a row of running text, a dialog heading. Canvas text is a
-     separate world — it uses --sq-font and is not governed here. The wordmark
-     is deliberately outside it too; it is brand, not a control.
-
-     These read a step larger than the numbers suggest, because Geist has a
-     tall x-height — 11px here sits where 12px would in most faces. Judge the
-     panel by eye rather than by the number, and if you retune one of these,
-     retune it against the others rather than nudging a component. */
-  --text-micro: 10px; /* kbd chips, counts, the axis letter in a field */
-  --text-label: 11px; /* panel labels, values, panel copy */
-  --text-row: 13px; /* menu rows, palette rows, a panel's own title */
-  --text-title: 15px; /* dialog headings and the ⌘K hero input */
+  /* Every UI role includes its line height so inherited leading cannot make
+     labels cramped in one panel and loose in another. 12px is the floor;
+     weight, spacing and contrast carry the hierarchy instead of tiny text.
+     Document lettering and the wordmark have their own scales. */
+  --text-micro: 12px; /* shortcuts, counts, field prefixes, supporting metadata */
+  --text-micro--line-height: 16px;
+  --text-label: 13px; /* panel labels, values, controls and explanatory copy */
+  --text-label--line-height: 20px;
+  --text-row: 14px; /* menu rows, search results and panel titles */
+  --text-row--line-height: 20px;
+  --text-title: 16px; /* dialog headings and the command palette input */
+  --text-title--line-height: 24px;
 
   /* Layout rhythm. The panel gutter, the gap between rows, and the seam every
      label stops at so controls line up down one edge. */
-  --spacing-gutter: 14px;
-  --spacing-row: 10px;
-  --spacing-label: 60px;
+  --spacing-gutter: 16px;
+  --spacing-row: 12px;
+  --spacing-label: 72px;
 
   /* Depth. Two elevations only: a panel resting on the canvas, and a popup
      floating over a panel. */
@@ -129,7 +128,7 @@
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
+  --muted-foreground: oklch(0.49 0 0);
   --accent: oklch(0.97 0 0);
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.577 0.245 27.325);
@@ -164,7 +163,7 @@
   --secondary: oklch(0.269 0 0);
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
+  --muted-foreground: oklch(0.75 0 0);
   --accent: oklch(0.269 0 0);
   --accent-foreground: oklch(0.985 0 0);
   --destructive: oklch(0.704 0.191 22.216);
@@ -191,7 +190,7 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-label text-foreground;
   }
   html {
     @apply font-sans;

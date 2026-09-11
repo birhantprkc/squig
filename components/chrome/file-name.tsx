@@ -120,7 +120,7 @@ export function FileName() {
       )}
       <span
         aria-live="polite"
-        className={`absolute top-full left-1/2 mt-1 -translate-x-1/2 text-[11px] whitespace-nowrap transition-opacity duration-200 ${
+        className={`absolute top-full left-1/2 mt-1 -translate-x-1/2 text-micro whitespace-nowrap transition-opacity duration-200 ${
           stuck ? "text-destructive" : "text-muted-foreground"
         }`}
         style={{ opacity: note ? 1 : 0 }}

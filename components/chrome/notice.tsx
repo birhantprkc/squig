@@ -41,7 +41,7 @@ export function Notice() {
   return (
     <div
       aria-live="polite"
-      className="pointer-events-none absolute bottom-16 left-1/2 z-40 -translate-x-1/2 rounded-chrome-lg border border-border/80 bg-background px-3 py-1.5 text-label whitespace-nowrap text-muted-foreground shadow-popup transition-opacity duration-200"
+      className="pointer-events-none absolute bottom-16 left-1/2 z-40 -translate-x-1/2 rounded-chrome-lg border border-border/80 bg-background max-w-[calc(100vw-2rem)] w-max px-gutter py-2.5 text-center text-label text-muted-foreground shadow-popup transition-opacity duration-200"
       style={{ opacity: shown ? 1 : 0 }}
     >
       {text}

@@ -78,6 +78,9 @@ subject.
   and it is Postgres-backed; see
   [docs/agent-architecture.md](docs/agent-architecture.md).
 - **No emoji in UI copy.**
+- **Use the shared UI type scale.** Sizes, line heights and spacing live in
+  `app/globals.css`; [docs/ui-typography.md](docs/ui-typography.md) explains the
+  roles. Make room for labels instead of shrinking them.
 
 ## The big files
 

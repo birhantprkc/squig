@@ -69,8 +69,8 @@ export function PanelHeader({
       )}
     >
       <div className="min-w-0">
-        <h2 className="truncate text-row leading-tight font-medium">{title}</h2>
-        {subtitle && <p className="mt-1 truncate text-label leading-tight text-muted-foreground">{subtitle}</p>}
+        <h2 className="truncate text-row font-semibold">{title}</h2>
+        {subtitle && <p className="mt-1 text-micro text-muted-foreground">{subtitle}</p>}
       </div>
       {right && <div className="flex shrink-0 items-center gap-0.5">{right}</div>}
     </div>
@@ -79,7 +79,7 @@ export function PanelHeader({
 
 export function PanelFooter({ className, children }: { className?: string; children: React.ReactNode }) {
   return (
-    <div className={cn("flex shrink-0 items-center gap-2 border-t border-border/70 p-3", className)}>{children}</div>
+    <div className={cn("flex shrink-0 items-center gap-2 border-t border-border/70 px-gutter py-3", className)}>{children}</div>
   )
 }
 
@@ -157,11 +157,11 @@ export function PanelSection({
             headings are as quiet as the labels has no hierarchy at all — it
             just has rows. */}
         <Collapsible.Trigger className="group flex min-w-0 flex-1 items-center gap-1.5 px-gutter pt-gutter pb-2 text-left outline-none">
-          <span className="truncate text-label font-medium text-foreground">{title}</span>
+          <span className="truncate text-label font-semibold text-foreground">{title}</span>
           {count !== undefined && <span className="text-micro text-muted-foreground tabular-nums">({count})</span>}
           <CaretRightIcon
             weight="bold"
-            className="ml-auto size-2.5 shrink-0 text-muted-foreground/60 transition-transform duration-150 group-data-[panel-open]:rotate-90"
+            className="ml-auto size-3 shrink-0 text-muted-foreground transition-transform duration-150 group-data-[panel-open]:rotate-90"
           />
         </Collapsible.Trigger>
         {right}
@@ -213,7 +213,7 @@ export function Row({
         <label
           htmlFor={htmlFor}
           className={cn(
-            "shrink-0 truncate text-label text-muted-foreground select-none",
+            "shrink-0 text-label text-pretty wrap-anywhere text-muted-foreground select-none",
             spread ? "flex-1" : "w-label",
             align === "start" && "pt-2"
           )}
@@ -246,5 +246,5 @@ export function StackRow({
 
 /** Explanatory aside — grouping hints, empty states, "these don't share knobs". */
 export function PanelNote({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <p className={cn("text-label leading-relaxed text-muted-foreground", className)}>{children}</p>
+  return <p className={cn("text-label text-pretty text-muted-foreground", className)}>{children}</p>
 }

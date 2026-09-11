@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils"
 import { CaretRightIcon } from "@phosphor-icons/react"
 
 const POPUP =
-  "min-w-52 origin-(--transform-origin) rounded-chrome-lg bg-popover p-1.5 text-popover-foreground shadow-popup ring-1 ring-foreground/10 outline-none transition-[transform,opacity] duration-100 data-starting-style:scale-95 data-starting-style:opacity-0 data-ending-style:scale-95 data-ending-style:opacity-0"
+  "max-h-(--available-height) min-w-52 origin-(--transform-origin) overflow-y-auto overscroll-contain rounded-chrome-lg bg-popover p-1.5 text-popover-foreground shadow-popup ring-1 ring-foreground/10 outline-none transition-[transform,opacity] duration-100 data-starting-style:scale-95 data-starting-style:opacity-0 data-ending-style:scale-95 data-ending-style:opacity-0"
 
 /**
  * A menu row is a place to land, not a line of text — it gets a real height and
@@ -75,7 +75,7 @@ function DropdownMenuShortcut({ className, ...props }: React.ComponentProps<"spa
   return (
     <span
       data-slot="dropdown-menu-shortcut"
-      className={cn("ml-auto pl-6 text-label text-muted-foreground", className)}
+      className={cn("ml-auto pl-6 text-micro text-muted-foreground", className)}
       {...props}
     />
   )

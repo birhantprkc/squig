@@ -158,7 +158,7 @@ const FIELD_INPUT =
   "h-full w-full min-w-0 bg-transparent text-label tabular-nums outline-none placeholder:text-muted-foreground [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
 
 const FIELD_HANDLE =
-  "flex shrink-0 cursor-ew-resize items-center rounded-chrome-xs px-1 py-1 text-micro leading-none text-muted-foreground/80 select-none hover:bg-accent hover:text-foreground"
+  "flex shrink-0 cursor-ew-resize items-center rounded-chrome-xs px-1 py-1 text-micro text-muted-foreground select-none hover:bg-accent hover:text-foreground"
 
 /**
  * The drag target when a field has no axis letter to put there — font size,
@@ -457,7 +457,7 @@ export function MixedSwitch({
       )}
     >
       <span className="pointer-events-none block size-4 translate-x-[calc(50%-2px)] rounded-full bg-background dark:bg-foreground" />
-      <span className="pointer-events-none absolute inset-0 flex items-center justify-center text-[9px] leading-none font-semibold text-muted-foreground">
+      <span className="pointer-events-none absolute inset-0 flex items-center justify-center text-micro font-semibold text-muted-foreground">
         {MIXED_LABEL}
       </span>
     </button>

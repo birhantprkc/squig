@@ -81,7 +81,7 @@ export default function CanvasError({
         <h1 className="text-2xl" style={{ color: "var(--sq-ink)", fontFamily: "var(--sq-font)" }}>
           squig lost its place
         </h1>
-        <p className="mt-3 text-sm leading-relaxed" style={{ color: "var(--sq-muted)", fontFamily: "var(--sq-font)" }}>
+        <p className="mt-3 text-row leading-relaxed text-muted-foreground">
           something on this page stopped it drawing. nothing has been thrown away — every drawing is still saved in
           this browser, this one included. try it again, or go and sit with another one for a bit.
         </p>
@@ -124,7 +124,7 @@ export default function CanvasError({
         )}
 
         {/* the one line worth quoting if this ever gets reported */}
-        <p className="mt-6 font-mono text-label break-words text-muted-foreground/70">
+        <p className="mt-6 font-mono text-label break-words text-muted-foreground">
           {error.message || "no message"}
           {error.digest ? ` · ${error.digest}` : ""}
         </p>

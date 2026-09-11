@@ -235,7 +235,7 @@ export function CanvasContextMenu() {
   return (
     <div
       ref={ref}
-      className="fixed z-50 min-w-52 rounded-chrome-lg border border-border/80 bg-background p-1.5 shadow-popup"
+      className="fixed z-50 max-h-[calc(100dvh-1rem)] min-w-52 overflow-y-auto overscroll-contain rounded-chrome-lg border border-border/80 bg-background p-1.5 shadow-popup"
       style={{ left: pos.x, top: pos.y }}
       onPointerDown={(e) => e.stopPropagation()}
       onContextMenu={(e) => e.preventDefault()}
@@ -260,7 +260,7 @@ export function CanvasContextMenu() {
               weight="fill"
             />
             <span className="flex-1 truncate">{entry.label}</span>
-            {entry.hint && <span className="pl-6 font-mono text-label text-muted-foreground">{entry.hint}</span>}
+            {entry.hint && <span className="pl-6 text-micro text-muted-foreground">{entry.hint}</span>}
           </button>
         )
       )}

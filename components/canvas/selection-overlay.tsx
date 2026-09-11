@@ -457,8 +457,8 @@ export function SmartGuides({ guides, distances }: { guides: GuideLine[]; distan
       )}
       {distances.map((d, i) => {
         const label = String(d.distance)
-        const labelW = Math.max(18, label.length * 6 + 8)
-        const labelH = 16
+        const labelW = Math.max(24, label.length * 8 + 12)
+        const labelH = 20
         return (
           <g key={`distance-${d.axis}-${i}`}>
             <line x1={d.x1} y1={d.y1} x2={d.x2} y2={d.y2} stroke="var(--sq-measure)" strokeWidth={1} />
@@ -487,9 +487,7 @@ export function SmartGuides({ guides, distances }: { guides: GuideLine[]; distan
               dy="0.34em"
               fill="white"
               fontFamily="var(--font-sans), ui-sans-serif, sans-serif"
-              fontSize={10}
-              fontWeight={650}
-              style={{ fontVariantNumeric: "tabular-nums" }}
+              className="text-micro font-medium tabular-nums"
               textAnchor="middle"
             >
               {label}

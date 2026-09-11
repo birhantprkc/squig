@@ -230,6 +230,7 @@ export function MixedNumberField({
   // left an undo entry that restores the state it was already in — an undo you
   // have to press twice.
   const scrubPending = useRef(false)
+  const [draftEpoch, setDraftEpoch] = useState(0)
 
   // A mixed field has no number to hand a spinbutton, and Base UI would read
   // the empty value as zero the moment you dragged it — so the two states are
@@ -249,6 +250,7 @@ export function MixedNumberField({
 
   return (
     <NumberField.Root
+      key={draftEpoch}
       value={shared.value}
       min={min}
       max={max}
@@ -291,7 +293,16 @@ export function MixedNumberField({
           aria-label={ariaLabel || undefined}
           className={FIELD_INPUT}
           // the canvas listens globally; a digit typed here is not a shortcut
-          onKeyDown={(e) => e.stopPropagation()}
+          onKeyDown={(e) => {
+            e.stopPropagation()
+            if (e.key === "Enter") e.currentTarget.blur()
+            // Base UI commits on blur. Remounting drops its private draft so
+            // Escape has the same cancel meaning as the other inspector fields.
+            if (e.key === "Escape") {
+              e.preventDefault()
+              setDraftEpoch((epoch) => epoch + 1)
+            }
+          }}
         />
       </NumberField.Group>
     </NumberField.Root>

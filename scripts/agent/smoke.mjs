@@ -11,8 +11,8 @@ if (!process.env.DATABASE_URL)
 const sql = neon(process.env.DATABASE_URL)
 const hash = (v) => createHash("sha256").update(v).digest("hex")
 const workspaces = []
-const key = randomBytes(32).toString("hex"),
-  other = randomBytes(32).toString("hex")
+const key = `sq_${randomBytes(32).toString("base64url")}`,
+  other = `sq_${randomBytes(32).toString("base64url")}`
 async function fixture(key) {
   const id = `test_${randomBytes(10).toString("hex")}`
   await sql`INSERT INTO agent_workspaces (id,name,key_hash) VALUES (${id},'Integration test',${hash(key)})`

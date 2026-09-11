@@ -3,6 +3,11 @@ import { useEffect, useState, useRef } from "react"
 import { useCanvasSyncIssue } from "@/lib/agent/sync-status"
 import { useSquig } from "@/lib/store"
 import { agentRequest, KEY_STORAGE } from "@/lib/agent/client"
+import {
+  canvasConnection,
+  canvasStorage,
+  workspaceKey,
+} from "@/lib/agent/credentials"
 import { agentInvite, mcpConfig } from "@/lib/agent/invite"
 import { prepareCanvas, applyPreparedImages } from "@/lib/agent/prepare-canvas"
 import { unionBox } from "@/lib/types"
@@ -36,10 +41,10 @@ const editable = (doc: Snapshot): Snapshot => ({
   look: doc.look,
 })
 const equal = canvasEqual
-const canvasStorage = (id: string) => `squig:canvas-key:${id}`
 
 export function AgentBridge({ hidden = false }: { hidden?: boolean }) {
   const attaching = useRef<string | null>(null)
+  const invitation = useRef<{ id: string; fragment: string } | null>(null)
   const [status, setStatus] = useState("")
   function reportIssue(message: string) {
     setStatus(message)
@@ -63,25 +68,14 @@ export function AgentBridge({ hidden = false }: { hidden?: boolean }) {
   const [connectBusy, setConnectBusy] = useState(false)
   useEffect(() => {
     const id = new URLSearchParams(location.search).get("agent")
-    if (!id) return
     const fragment = location.hash.slice(1)
-    if (fragment.startsWith("sq_canvas_")) {
-      localStorage.setItem(canvasStorage(id), fragment)
+    // Scrub before validation or storage access, which can throw. Keep the
+    // candidate in memory until the server confirms it belongs to this canvas.
+    if (location.hash && (id !== null || fragment.startsWith("sq_"))) {
       history.replaceState(null, "", location.pathname + location.search)
+      if (id !== null) invitation.current = { id, fragment }
     }
-    const canvasKey = localStorage.getItem(canvasStorage(id))
-    const key = canvasKey || localStorage.getItem(KEY_STORAGE)
-    if (!key) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- browser-only connection hydration
-      reportIssue("Open the full canvas invitation link to connect.")
-      return
-    }
-    if (canvasKey)
-      setCredentials({
-        key: canvasKey,
-        url: `${location.origin}/?agent=${id}#${canvasKey}`,
-        id,
-      })
+    if (id === null) return
     let active = true,
       busy = false,
       initialized = false,
@@ -93,6 +87,7 @@ export function AgentBridge({ hidden = false }: { hidden?: boolean }) {
     function detach() {
       active = false
       stopped = true
+      invitation.current = null
       setConnected(false)
       setConflict(false)
       setCredentials({ key: "", url: "", id: "" })
@@ -100,6 +95,34 @@ export function AgentBridge({ hidden = false }: { hidden?: boolean }) {
       clearIssue()
       history.replaceState(null, "", "/")
       setStatus("")
+    }
+    function watchDocument() {
+      return useSquig.subscribe((s) => {
+        if (
+          active &&
+          (initialized || stopped) &&
+          s.docId !== (initialized ? localId : openingId)
+        ) detach()
+      })
+    }
+    let connection: ReturnType<typeof canvasConnection>
+    try {
+      connection = canvasConnection(
+        id,
+        invitation.current?.id === id ? invitation.current.fragment : undefined,
+        localStorage,
+      )
+    } catch (e) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- report invalid browser-only invitations after SSR
+      reportIssue((e as Error).message)
+      stopped = true
+      return watchDocument()
+    }
+    const { key, canvasKey } = connection
+    if (!key) {
+      reportIssue("Open the full canvas invitation link to connect.")
+      stopped = true
+      return watchDocument()
     }
     function apply(doc: Snapshot) {
       const s = useSquig.getState()
@@ -146,6 +169,18 @@ export function AgentBridge({ hidden = false }: { hidden?: boolean }) {
           if (useSquig.getState().docId !== openingId) {
             detach()
             return
+          }
+          if (canvasKey) {
+            try {
+              localStorage.setItem(canvasStorage(id!), canvasKey)
+            } catch {
+              // A private or full browser can still use this tab's invitation.
+            }
+            setCredentials({
+              key: canvasKey,
+              url: `${location.origin}/?agent=${id}#${canvasKey}`,
+              id: id!,
+            })
           }
           const keepCurrent = attaching.current === id
           if (!keepCurrent)
@@ -253,6 +288,11 @@ export function AgentBridge({ hidden = false }: { hidden?: boolean }) {
           return
         }
         const error = e as Error & { status?: number }
+        if (error.status === 401 || error.status === 403 || error.status === 404) {
+          stopped = true
+          setConnected(false)
+          setCredentials({ key: "", url: "", id: "" })
+        }
         // A racing commit is retried against the fresh revision next tick.
         if (error.status !== 409) reportIssue(error.message)
       } finally {
@@ -263,9 +303,7 @@ export function AgentBridge({ hidden = false }: { hidden?: boolean }) {
     const timer = setInterval(tick, 1000)
     // Release the old invitation immediately, including while a save is in
     // flight or a conflict has stopped polling.
-    const unsubscribe = useSquig.subscribe((s) => {
-      if (active && initialized && s.docId !== localId) detach()
-    })
+    const unsubscribe = watchDocument()
     const prevent = (e: BeforeUnloadEvent) => {
       if (active && initialized && !equal(snapshot(), baseline)) {
         e.preventDefault()
@@ -284,6 +322,11 @@ export function AgentBridge({ hidden = false }: { hidden?: boolean }) {
   const connecting = useRef(false)
   async function connect() {
     if (credentials.key || connecting.current) return
+    // An unopened or revoked invitation must never publish the local draft.
+    if (new URLSearchParams(location.search).has("agent") && !connected) {
+      if (!status) reportIssue("Open a valid canvas invitation before sharing.")
+      return
+    }
     connecting.current = true
     setConnectBusy(true)
     setConnectError("")
@@ -294,7 +337,7 @@ export function AgentBridge({ hidden = false }: { hidden?: boolean }) {
       const original = JSON.parse(useSquig.getState().serialize())
       const doc = await prepareCanvas(original)
       if (useSquig.getState().docId !== sourceId) return
-      let key = localStorage.getItem(KEY_STORAGE)
+      let key = workspaceKey(localStorage)
       if (!key) {
         const workspace = await agentRequest("workspaces", "", {
           name: "My Squig canvases",

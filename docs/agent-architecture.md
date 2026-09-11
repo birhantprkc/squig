@@ -22,8 +22,13 @@ validated, atomic command engine.
 Canvas keys can inspect and edit only their document. They cannot create or
 delete canvases, rotate keys, or access siblings in the workspace. Workspace
 keys can manage those actions. Keys are random and stored as SHA-256 hashes.
-The invitation secret is in the URL fragment; the editor stores it locally
-and removes it from the address bar. The server receives it as a bearer header.
+The invitation secret is in the URL fragment. The editor removes it from the
+address bar before reading storage, and saves or shares it only after the server
+confirms access to that document. A supplied invitation never falls back to the
+browser's workspace key. Rejected or revoked invitations stop synchronization
+and clear the displayed sharing credential, preserving the local draft.
+Workspace and canvas keys have separate formats and storage slots; the workspace
+connection form accepts only workspace keys. The server receives keys as bearer headers.
 `rotate_canvas_link` revokes the previous canvas key without rotating the
 workspace key. Treat invitations as editing credentials.
 
@@ -103,6 +108,10 @@ local document unchanged. Newly pasted SVGs are also stored as raster images.
 ## Verification
 
 Run `pnpm test`, `pnpm test:agent`, `pnpm lint`, `pnpm build` and `make build-xdc`.
+With the app running, `pnpm test:agent:security-browser` checks invitation
+validation, credential storage, revocation, framing headers and the local canvas
+with an intercepted API, requiring no database. Set `SQUIG_TEST_URL` to override
+the default `http://localhost:3000`.
 With the app running and DATABASE_URL loaded, run the real REST/MCP integration
 suite and `pnpm test:agent:browser`. These create isolated fixtures and clean
 them up. Browser coverage includes direct invitations, existing local files,

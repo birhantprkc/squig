@@ -854,4 +854,95 @@ check(
   check("a height patch can't push the words out of the box", squashed.nodes.para.h === needed && needed > 1)
 }
 
+// -- credentials fail closed before storage or database access --------------
+
+const { keyKind, canvasConnection, workspaceKey, canvasStorage, KEY_STORAGE } =
+  await import("../lib/agent/credentials.ts")
+const { authenticate, hash, token } = await import("../lib/agent/db.ts")
+const { neonConfig } = await import("@neondatabase/serverless")
+const workspaceSecret = `sq_${token()}`
+const canvasSecret = `sq_canvas_${token()}`
+check("issued keys have distinct capabilities", keyKind(workspaceSecret) === "workspace" && keyKind(canvasSecret) === "canvas")
+for (const bad of ["", "sq_canvas_fake", workspaceSecret + "\n", canvasSecret + " extra", "sq_" + "a".repeat(10000)])
+  check("malformed keys are rejected", keyKind(bad) === null)
+const stored = new Map([[KEY_STORAGE, workspaceSecret], [canvasStorage("one"), canvasSecret]])
+const storage = { getItem: (name: string) => stored.get(name) ?? null }
+check("owners can still open a plain canvas URL", canvasConnection("two", undefined, storage).key === workspaceSecret)
+check("saved canvas keys take precedence over owner credentials", canvasConnection("one", undefined, storage).key === canvasSecret)
+check("a new invitation is only a candidate; it does not overwrite storage", canvasConnection("one", `sq_canvas_${token()}`, storage).canvasKey !== stored.get(canvasStorage("one")))
+for (const fragment of [workspaceSecret, "sq_canvas_fake", "", canvasSecret + "\n"])
+  check("an invalid invitation never falls back to a saved owner key", refused(() => canvasConnection("one", fragment, storage)))
+for (const badId of ["../catalog", "one/../../catalog", "one?x=1", "one#x", "one\n", "", "a".repeat(81)])
+  check("untrusted canvas IDs cannot become request paths", refused(() => canvasConnection(badId, canvasSecret, storage)))
+stored.set(KEY_STORAGE, canvasSecret)
+check("canvas keys cannot occupy the workspace credential slot", workspaceKey(storage) === null)
+stored.set(canvasStorage("one"), workspaceSecret)
+check("workspace credentials cannot be shared from a canvas slot", refused(() => canvasConnection("one", undefined, storage)))
+
+async function statusOf(run: () => Promise<unknown>) {
+  try { await run(); return 200 } catch (e) { return e instanceof AgentError ? e.status : 500 }
+}
+const scopedPrincipal = { workspaceId: "w", documentId: "one" }
+for (const [name, args] of [
+  ["create_document", { name: "No" }],
+  ["delete_document", { documentId: "one", revision: 1 }],
+  ["rotate_canvas_link", { documentId: "one" }],
+] as const)
+  check(`canvas keys cannot ${name}`, await statusOf(() => execute(name, args, scopedPrincipal)) === 403)
+for (const [name, args] of [
+  ["get_document", {}], ["edit_document", { revision: 1, operations: [{ op: "rename", name: "No" }] }],
+  ["replace_document", { revision: 1, document: emptyDocument("No") }],
+  ["history", {}], ["restore", { revision: 1, targetRevision: 1 }],
+  ["comment", { text: "No" }], ["resolve_comment", { commentId: "c", resolved: true }],
+  ["export_document", {}], ["measure_text", {}], ["render_document", { format: "svg" }],
+] as const)
+  check(`canvas keys cannot ${name} on siblings`, await statusOf(() => execute(name, { ...args, documentId: "two" }, scopedPrincipal)) === 404)
+
+// Mock only Neon's HTTP boundary: the real authentication and REST/MCP handlers run.
+const previousDb = process.env.DATABASE_URL
+const previousFetch = neonConfig.fetchFunction
+let queries = 0
+neonConfig.fetchFunction = async (_url: string, init: RequestInit) => {
+  queries++
+  const { query, params } = JSON.parse(String(init.body))
+  let rows: Record<string, string>[] = []
+  if (query.includes("FROM agent_workspaces")) {
+    check("only the workspace hash reaches its lookup", params[0] === hash(workspaceSecret))
+    rows = [{ id: "w" }]
+  } else if (query.includes("FROM agent_documents")) {
+    check("only the canvas hash reaches its lookup", params[0] === hash(canvasSecret))
+    rows = [{ id: "one", workspace_id: "w" }]
+  } else if (query.includes("INSERT INTO agent_limits")) {
+    rows = [{ count: "1" }]
+  } else throw new Error("Unexpected security test query")
+  const names = Object.keys(rows[0] ?? {})
+  return Response.json({ fields: names.map((name) => ({ name, dataTypeID: 25 })), rows: rows.map((row) => names.map((name) => row[name])) })
+}
+process.env.DATABASE_URL = "postgresql://test:test@security.invalid/test"
+try {
+  const req = (secret?: string) => new Request("https://squig.sh/api/v1/documents", { headers: secret ? { Authorization: `Bearer ${secret}` } : {} })
+  for (const bad of [undefined, "bad", "sq_canvas_invalid", "sq_" + "x".repeat(5000)])
+    check("malformed bearer is rejected without a database call", await statusOf(() => authenticate(req(bad))) === 401 && queries === 0)
+  check("workspace authentication has no document scope", same(await authenticate(req(workspaceSecret)), { workspaceId: "w" }))
+  check("canvas authentication retains its document scope", same(await authenticate(req(canvasSecret)), scopedPrincipal))
+  const rest = await import("../app/api/v1/[...path]/route.ts")
+  const rotate = await rest.POST(new Request("https://squig.sh/api/v1/workspace/rotate-key", {
+    method: "POST", headers: { Authorization: `Bearer ${canvasSecret}`, "Content-Type": "application/json" }, body: "{}",
+  }), { params: Promise.resolve({ path: ["workspace", "rotate-key"] }) })
+  check("REST workspace rotation refuses canvas keys", rotate.status === 403)
+  const mcp = await import("../app/mcp/route.ts")
+  const request = new Request("https://squig.sh/mcp", {
+    method: "POST", headers: { Authorization: `Bearer ${canvasSecret}`, "Content-Type": "application/json", Accept: "application/json, text/event-stream" },
+    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "squig_get_document", arguments: { documentId: "two" } } }),
+  })
+  const response = await mcp.POST(request)
+  const rpc = await response.json()
+  check("MCP enforces the same document boundary", rpc.result?.isError === true && JSON.parse(rpc.result.content[0].text).status === 404)
+  check("MCP responses carrying private data cannot be cached", response.headers.get("cache-control") === "no-store" && response.headers.get("referrer-policy") === "no-referrer")
+} finally {
+  neonConfig.fetchFunction = previousFetch
+  if (previousDb === undefined) delete process.env.DATABASE_URL
+  else process.env.DATABASE_URL = previousDb
+}
+
 report(`agent engine checks passed (${ALL_DEFS.length} library definitions)`)

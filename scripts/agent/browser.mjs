@@ -5,7 +5,7 @@ import { mkdir, readFile } from "node:fs/promises"
 const base = process.env.SQUIG_TEST_URL ?? "http://localhost:3001"
 const sql = neon(process.env.DATABASE_URL)
 const workspace = `browser_${randomBytes(10).toString("hex")}`,
-  key = randomBytes(32).toString("hex")
+  key = `sq_${randomBytes(32).toString("base64url")}`
 const browser = await chromium.launch()
 const context = await browser.newContext({
   viewport: { width: 1440, height: 1000 },

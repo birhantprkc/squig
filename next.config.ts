@@ -9,6 +9,22 @@ const webxdc = process.env.WEBXDC === "1";
 const nextConfig: NextConfig = {
   env: { NEXT_PUBLIC_SQUIG_OFFLINE: webxdc ? "1" : "0" },
   ...(webxdc ? { pageExtensions: ["tsx"] } : {}),
+  ...(webxdc
+    ? {}
+    : {
+        async headers() {
+          return [{
+            source: "/:path*",
+            headers: [
+              // Sharing grants editing access; don't let another site overlay its controls.
+              { key: "Content-Security-Policy", value: "frame-ancestors 'none'" },
+              { key: "X-Frame-Options", value: "DENY" },
+              { key: "Referrer-Policy", value: "no-referrer" },
+              { key: "X-Content-Type-Options", value: "nosniff" },
+            ],
+          }];
+        },
+      }),
   // resvg is a native Node addon: bundling it fails ("non-ecmascript placeable
   // asset"), so it stays a plain require at runtime.
   serverExternalPackages: ["@resvg/resvg-js"],

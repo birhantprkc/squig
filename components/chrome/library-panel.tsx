@@ -90,17 +90,17 @@ function Preview({
       }}
       title={def.name}
       className={cn(
-        "group flex flex-col items-center gap-1 rounded-chrome-sm border border-border/70 p-1 transition-colors outline-none hover:border-border hover:bg-accent",
+        "group flex min-w-0 flex-col items-center gap-1 rounded-chrome-sm border border-border/70 p-2 transition-colors outline-none hover:border-border hover:bg-accent",
         active && "border-[var(--sq-ink)] bg-[var(--sq-ink)]/8 ring-1 ring-inset ring-[var(--sq-ink)]/25"
       )}
     >
-      <svg width={BOX_W} height={BOX_H} className="shrink-0">
+      <svg width={BOX_W} height={BOX_H} viewBox={`0 0 ${BOX_W} ${BOX_H}`} className="h-auto max-w-full shrink-0">
         <g transform={`translate(${ox} ${oy}) scale(${scale})`}>
           <SketchPrims prims={prims} seed={13} />
         </g>
       </svg>
       {/* a component's name, not a hint — it stays at label size */}
-      <span className="w-full truncate pb-0.5 text-center text-label leading-none text-muted-foreground group-hover:text-foreground">
+      <span className="flex min-h-10 w-full items-center justify-center text-center text-label text-pretty text-foreground">
         {def.name}
       </span>
     </button>
@@ -134,9 +134,9 @@ function Library({ panel }: { panel: Exclude<PanelKind, null> }) {
   const first = sections[0]?.defs[0]
 
   return (
-    <Panel className="absolute top-1/2 left-16 z-30 max-h-[82vh] w-[316px] -translate-y-1/2">
-      <div className="relative shrink-0 border-b border-border/70 p-3">
-        <MagnifyingGlassIcon className="pointer-events-none absolute top-1/2 left-[22px] size-4 -translate-y-1/2 text-muted-foreground" />
+    <Panel className="absolute top-1/2 left-[72px] z-30 max-h-[82vh] w-[336px] max-w-[calc(100vw-88px)] -translate-y-1/2">
+      <div className="relative shrink-0 border-b border-border/70 p-gutter">
+        <MagnifyingGlassIcon className="pointer-events-none absolute top-1/2 left-[26px] size-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           ref={inputRef}
           value={query}
@@ -155,10 +155,10 @@ function Library({ panel }: { panel: Exclude<PanelKind, null> }) {
           The scrollbar fades in while scrolling or hovering, so a list this
           long doesn't look like it ends at the fold. */}
       <ScrollArea className="min-h-0 flex-1 overscroll-contain">
-        <div className="p-3 pt-1.5">
+        <div className="p-gutter pt-1.5">
           {sections.map((section) => (
             <div key={section.group} className="mb-3">
-              <div className="px-0.5 pt-2 pb-2 text-label font-medium text-foreground">
+              <div className="px-0.5 pt-2 pb-2 text-label font-semibold text-foreground">
                 {section.group}
               </div>
               <div className="grid grid-cols-2 gap-1.5">
@@ -182,7 +182,7 @@ function Library({ panel }: { panel: Exclude<PanelKind, null> }) {
         </div>
       </ScrollArea>
 
-      <PanelFooter className="px-gutter py-2.5 text-label text-muted-foreground">
+      <PanelFooter className="text-micro text-muted-foreground">
         {placingDrag
           ? "let go where you want it"
           : placing

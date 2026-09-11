@@ -52,7 +52,7 @@ export function TopCorner() {
         </DropdownMenuTrigger>
         <DropdownMenuContent
           align="start"
-          className="w-56"
+          className="w-64"
           // Rename hands focus to the floating name field; returning focus to
           // the wordmark here would snatch it straight back.
           finalFocus={() => {
@@ -189,7 +189,7 @@ export function CommandHint() {
       className="absolute bottom-4 left-1/2 z-30 flex h-ctl -translate-x-1/2 items-center gap-2 rounded-full border border-border/80 bg-background px-gutter text-label text-muted-foreground shadow-panel hover:text-foreground"
     >
       search everything
-      <kbd className="inline-flex h-4 items-center rounded-chrome-xs border bg-muted px-1 font-mono text-micro">⌘K</kbd>
+      <kbd className="inline-flex h-5 items-center rounded-chrome-xs border bg-muted px-1 font-sans text-micro">⌘K</kbd>
     </button>
   )
 }

@@ -39,13 +39,13 @@ function Cell({ def, scale }: { def: ComponentDef; scale: number }) {
         </svg>
       </div>
       <div className="flex items-baseline gap-2">
-        <span className="text-xs font-medium">{def.name}</span>
-        <span className="font-mono text-[10px] text-neutral-400">{def.kind}</span>
-        <span className="ml-auto font-mono text-[10px] text-neutral-400">
+        <span className="text-label font-medium">{def.name}</span>
+        <span className="font-mono text-micro text-muted-foreground">{def.kind}</span>
+        <span className="ml-auto font-mono text-micro text-muted-foreground">
           {w}×{h}
         </span>
       </div>
-      {failed && <p className="font-mono text-[10px] text-red-600">{(prims as { error: string }).error}</p>}
+      {failed && <p className="font-mono text-micro text-red-600">{(prims as { error: string }).error}</p>}
     </div>
   )
 }
@@ -87,13 +87,13 @@ export default function KitchenSink() {
     <div className="min-h-screen bg-white p-8 font-sans">
       <div className="sticky top-0 z-10 -mx-8 mb-6 flex items-center gap-4 border-b bg-white/90 px-8 py-3 backdrop-blur">
         <h1 className="text-lg font-bold tracking-tight">squig kitchen sink</h1>
-        <span className="text-sm text-neutral-500">{total} defs</span>
+        <span className="text-row text-muted-foreground">{total} defs</span>
         <div className="ml-4 flex gap-1">
           {(["components", "blocks"] as Category[]).map((c) => (
             <button
               key={c}
               onClick={() => setCategory(c)}
-              className={`rounded-lg px-3 py-1 text-sm capitalize ${
+              className={`rounded-lg px-3 py-1 text-row capitalize ${
                 category === c ? "bg-neutral-900 text-white" : "hover:bg-neutral-100"
               }`}
             >
@@ -101,7 +101,7 @@ export default function KitchenSink() {
             </button>
           ))}
         </div>
-        <label className="ml-auto flex items-center gap-2 text-sm text-neutral-500">
+        <label className="ml-auto flex items-center gap-2 text-row text-muted-foreground">
           scale {Math.round(scale * 100)}%
           <input
             type="range"
@@ -117,7 +117,7 @@ export default function KitchenSink() {
       {drawn &&
         sections.map((section) => (
           <section key={section.group} className="mb-10">
-            <h2 className="mb-3 text-xs font-semibold tracking-wide text-neutral-400 uppercase">
+            <h2 className="mb-3 text-label font-semibold text-foreground">
               {section.group} · {section.defs.length}
             </h2>
             <div className="flex flex-wrap items-start gap-6">

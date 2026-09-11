@@ -412,7 +412,7 @@ export function AgentBridge({ hidden = false }: { hidden?: boolean }) {
               className="z-50"
             >
               <Popover.Popup className="agent-connect-panel">
-                <Popover.Title className="font-medium">
+                <Popover.Title className="text-row font-semibold">
                   {kind === "share" ? "Share canvas" : "Connect an agent"}
                 </Popover.Title>
                 <Popover.Description>

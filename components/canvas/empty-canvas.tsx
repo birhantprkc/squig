@@ -77,7 +77,7 @@ export function EmptyCanvas() {
           <path key={i} d={d} />
         ))}
       </svg>
-      <p className="text-center text-sm" style={{ color: "var(--sq-muted)", fontFamily: "var(--sq-font)" }}>
+      <p className="text-center text-title text-muted-foreground">
         {line}
       </p>
     </div>

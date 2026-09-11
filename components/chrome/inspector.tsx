@@ -111,11 +111,10 @@ const FONT_OPTIONS: readonly SegmentOption<FontMode>[] = [
   { value: "serif", label: "Serif", content: <FontSample family="var(--font-serif)" /> },
 ]
 
-/** "Aa" set in one face — a little large for the row, because two letters at
-    11px don't carry enough of a face to tell it from its neighbour. */
+/** A larger sample makes the three canvas faces easy to tell apart. */
 function FontSample({ family }: { family: string }) {
   return (
-    <span className="text-[13px] leading-none" style={{ fontFamily: family }}>
+    <span className="text-title" style={{ fontFamily: family }}>
       Aa
     </span>
   )
@@ -142,7 +141,7 @@ const TEXT_BOX_BORDER_OPTIONS: readonly SegmentOption<TextBoxBorder>[] = [
 /** "A" set in one tone — the ink previewed on the thing it will colour. */
 function InkLetter({ color }: { color: string }) {
   return (
-    <span className="text-[13px] leading-none font-semibold" style={{ color }}>
+    <span className="text-title font-semibold" style={{ color }}>
       A
     </span>
   )
@@ -191,7 +190,7 @@ export function Inspector() {
   const subtitle = selected.length > 1 ? selectionSummary(selected) : undefined
 
   return (
-    <Panel className="absolute top-16 right-4 z-30 max-h-[calc(100vh-5rem)] w-[272px]">
+    <Panel className="absolute top-16 right-4 z-30 max-h-[calc(100vh-5rem)] w-[296px] max-w-[calc(100vw-88px)]">
       <PanelHeader title={heading} subtitle={subtitle} />
 
       <ScrollArea className="min-h-0">

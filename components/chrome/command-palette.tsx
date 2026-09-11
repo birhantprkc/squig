@@ -349,7 +349,7 @@ function Palette() {
             )}
             {sections.map((section) => (
               <div key={section.title} className="mb-2">
-                <div className="px-2.5 pt-3 pb-1.5 text-label font-medium text-foreground">
+                <div className="px-2.5 pt-3 pb-1.5 text-label font-semibold text-foreground">
                   {section.title}
                 </div>
                 {section.rows.map(({ row, index }) => (
@@ -373,11 +373,11 @@ function Palette() {
             ))}
           </div>
 
-          <div className="flex shrink-0 items-center gap-4 border-t border-border/70 px-4 py-2.5 text-label text-muted-foreground">
+          <div className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2 border-t border-border/70 px-4 py-3 text-micro text-muted-foreground">
             <span><Kbd>↑</Kbd><Kbd>↓</Kbd> move</span>
             <span><Kbd>↵</Kbd> pick</span>
             <span><Kbd>esc</Kbd> close</span>
-            <span className="ml-auto">components drop in the middle of your view</span>
+            <span className="w-full sm:ml-auto sm:w-auto">components drop in the middle of your view</span>
           </div>
         </div>
       </div>
@@ -387,7 +387,7 @@ function Palette() {
 
 function Kbd({ children }: { children: React.ReactNode }) {
   return (
-    <kbd className="mr-1 inline-flex h-4 min-w-4 items-center justify-center rounded-chrome-xs border bg-muted px-1 font-mono text-micro">
+    <kbd className="mr-1 inline-flex h-5 min-w-5 items-center justify-center rounded-chrome-xs border bg-muted px-1 font-sans text-micro">
       {children}
     </kbd>
   )
@@ -418,7 +418,7 @@ function PaletteRow({
         <>
           <row.action.icon className="size-4 shrink-0 text-muted-foreground" weight="regular" />
           <span className="flex-1 truncate">{row.action.label}</span>
-          {row.action.hint && <span className="pl-6 font-mono text-label text-muted-foreground">{row.action.hint}</span>}
+          {row.action.hint && <span className="pl-6 text-micro text-muted-foreground">{row.action.hint}</span>}
         </>
       ) : row.kind === "node" ? (
         <>

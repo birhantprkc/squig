@@ -50,7 +50,7 @@ function RailButton({
       </TooltipTrigger>
       <TooltipContent side="right" className="flex items-center gap-2">
         {label}
-        <kbd className="rounded-chrome-xs bg-muted px-1 font-mono text-micro text-muted-foreground">{hotkey}</kbd>
+        <kbd className="rounded-chrome-xs bg-muted px-1 font-sans text-micro text-muted-foreground">{hotkey}</kbd>
       </TooltipContent>
     </Tooltip>
   )

@@ -5,7 +5,7 @@
 //
 // A phone can draw on squig now — one finger inks, two fingers pan and zoom.
 // What a phone can't do is get out of the way of its own chrome: the inspector
-// is a fixed 272px pinned to the right and the tool rail sits on the left, so
+// is pinned to the right and the tool rail sits on the left, so
 // under about 700px the panels are lying on most of the paper.
 //
 // This is a note, not a redesign and not a wall. It says the honest thing once,

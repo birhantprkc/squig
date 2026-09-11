@@ -2,6 +2,7 @@ import { neon } from "@neondatabase/serverless"
 import { createHash, randomBytes } from "node:crypto"
 import { AgentError, type CanvasDocument } from "./engine"
 import { StorageError } from "./storage"
+import { keyKind } from "./credentials"
 
 export const token = () => randomBytes(32).toString("base64url")
 export const hash = (value: string) =>
@@ -39,7 +40,9 @@ export async function authenticate(
       401,
       "Supply Authorization: Bearer <key>. Get a canvas key from Connect agent in the editor, or a workspace key at /connect.",
     )
-  if (bearer.startsWith("sq_canvas_")) {
+  const kind = keyKind(bearer)
+  if (!kind) throw new AgentError(401, "Invalid key format")
+  if (kind === "canvas") {
     const rows =
       await db()`SELECT id, workspace_id FROM agent_documents WHERE canvas_hash = ${hash(bearer)}`
     if (!rows.length)

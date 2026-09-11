@@ -17,7 +17,7 @@ const savedLog = console.error
 const logs: string[] = []
 console.error = (...args) => { logs.push(args.join(" ")) }
 const context = (path: string) => ({ params: Promise.resolve({ path: path.split("/") }) })
-const request = (path: string, data?: unknown, key = "sq_test") => new Request(`http://localhost/api/v1/${path}`, {
+const request = (path: string, data?: unknown, key = `sq_${"t".repeat(43)}`) => new Request(`http://localhost/api/v1/${path}`, {
   method: data === undefined ? "GET" : "POST",
   headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
   ...(data === undefined ? {} : { body: JSON.stringify(data) }),

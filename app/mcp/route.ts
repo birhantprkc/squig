@@ -3,7 +3,7 @@ import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/
 import { authenticate } from "@/lib/agent/db"
 import { tools, type ToolName } from "@/lib/agent/schema"
 import { execute } from "@/lib/agent/service"
-import { checkOrigin, failure, body } from "@/lib/agent/http"
+import { checkOrigin, failure, body, headers } from "@/lib/agent/http"
 import { workflow } from "@/lib/agent/workflow"
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -129,7 +129,10 @@ export async function POST(request: Request) {
     })
     await server.connect(transport)
     try {
-      return await transport.handleRequest(request, { parsedBody })
+      const response = await transport.handleRequest(request, { parsedBody })
+      for (const [name, value] of Object.entries(headers))
+        response.headers.set(name, value)
+      return response
     } finally {
       await server.close()
     }
@@ -138,6 +141,6 @@ export async function POST(request: Request) {
   }
 }
 export async function GET() {
-  return new Response(null, { status: 405, headers: { Allow: "POST" } })
+  return new Response(null, { status: 405, headers: { ...headers, Allow: "POST" } })
 }
 export const DELETE = GET

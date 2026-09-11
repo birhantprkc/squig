@@ -1,5 +1,6 @@
 import { chromium, expect } from "@playwright/test"
 import { mkdir } from "node:fs/promises"
+import { randomBytes } from "node:crypto"
 
 // Run against a dev server with DATABASE_URL unset. Recovery uses an isolated
 // HTTP fixture so this check never needs, or writes to, a hosted database.
@@ -60,13 +61,13 @@ try {
   await page.unroute("**/api/v1/**")
   let uploaded
   let revision = 1
-  const canvasKey = "sq_canvas_rollout_fixture"
+  const canvasKey = `sq_canvas_${randomBytes(32).toString("base64url")}`
   const id = "rollout_fixture"
   await page.route("**/api/v1/**", async (route) => {
     const path = new URL(route.request().url()).pathname.replace("/api/v1/", "")
     const body = route.request().postDataJSON()
     let result
-    if (path === "workspaces") result = { key: "sq_workspace_fixture" }
+    if (path === "workspaces") result = { key: `sq_${randomBytes(32).toString("base64url")}` }
     else if (path === "documents") result = { id, revision, canvasKey }
     else if (path === "tools/replace_document") {
       uploaded = body.document

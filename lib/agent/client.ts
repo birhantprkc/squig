@@ -1,4 +1,4 @@
-export const KEY_STORAGE = "squig:agent-key"
+export { KEY_STORAGE } from "./credentials"
 export async function agentRequest(path: string, key: string, data?: unknown) {
   const response = await fetch(`/api/v1/${path}`, {
     method: data === undefined ? "GET" : "POST",
@@ -8,6 +8,8 @@ export async function agentRequest(path: string, key: string, data?: unknown) {
     },
     ...(data === undefined ? {} : { body: JSON.stringify(data) }),
     cache: "no-store",
+    // A credential-bearing request must never follow a redirect to another route.
+    redirect: "error",
   })
   const result = await response.json()
   if (!response.ok)

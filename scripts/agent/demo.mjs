@@ -6,7 +6,7 @@ import { neon } from "@neondatabase/serverless"
 const base = process.env.SQUIG_TEST_URL ?? "http://localhost:3001"
 const output = process.env.SQUIG_DEMO_FILE ?? "/tmp/squig-agent-demo.json"
 const sql = neon(process.env.DATABASE_URL)
-const key = randomBytes(32).toString("base64url"),
+const key = `sq_${randomBytes(32).toString("base64url")}`,
   workspace = `demo_${randomBytes(8).toString("hex")}`
 await sql`INSERT INTO agent_workspaces (id,name,key_hash) VALUES (${workspace},'Book club exploration',${createHash("sha256").update(key).digest("hex")})`
 async function call(path, data) {

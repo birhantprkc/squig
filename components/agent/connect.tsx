@@ -3,6 +3,7 @@ import { useEffect, useState } from "react"
 import Link from "next/link"
 import { AgentShell } from "./shell"
 import { agentRequest, KEY_STORAGE } from "@/lib/agent/client"
+import { keyKind, workspaceKey } from "@/lib/agent/credentials"
 export function Connect() {
   const [key, setKey] = useState(""),
     [input, setInput] = useState(""),
@@ -18,7 +19,7 @@ export function Connect() {
   // The workspace key exists only in this browser, never in server-rendered HTML.
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- hydrate the private browser credential after SSR
-    setKey(localStorage.getItem(KEY_STORAGE) ?? "")
+    setKey(workspaceKey(localStorage) ?? "")
     setEndpoint(`${location.origin}/mcp`)
   }, [])
   useEffect(() => {
@@ -32,8 +33,13 @@ export function Connect() {
     setError("")
     try {
       let next = existing
-      if (next) await agentRequest("documents", next)
-      else {
+      if (next) {
+        if (keyKind(next) !== "workspace")
+          throw new Error(
+            "Use a workspace key here. Open canvas invitations in the editor.",
+          )
+        await agentRequest("documents", next)
+      } else {
         const r = await fetch("/api/v1/workspaces", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -191,7 +197,7 @@ export function Connect() {
                   <summary>Manage this connection</summary>
                   <p className="agent-muted">
                     Rotating the key disconnects agents using the old one.
-                    Review links keep working.
+                    Editable canvas links keep working.
                   </p>
                   <button
                     className="agent-button secondary"

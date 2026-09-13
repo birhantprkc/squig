@@ -172,6 +172,7 @@ try {
   await expect(draft).toBeVisible()
   await trash.click()
   // Enter on the initial focus cancels instead of deleting.
+  await expect(cancel).toBeFocused()
   await files.page.keyboard.press("Enter")
   await expect(confirmation).toHaveCount(0)
   await openRecents()
@@ -188,6 +189,7 @@ try {
   const palette = files.page.getByRole("button", { name: /^Palette —/ })
   await palette.click()
   const selectedInk = files.page.getByRole("menuitem", { name: "Internet blue", exact: true })
+  await expect(files.page.getByRole("menu").filter({ has: selectedInk })).toHaveCSS("opacity", "1")
   const inkMark = selectedInk.locator('[data-slot="selection-indicator"]')
   const [inkBox, inkMarkBox] = await Promise.all([selectedInk.boundingBox(), inkMark.boundingBox()])
   expect(inkBox.x + inkBox.width - inkMarkBox.x - inkMarkBox.width).toBeCloseTo(8, 0)

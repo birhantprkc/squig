@@ -31,6 +31,7 @@ export interface AgentPrincipal {
 }
 export async function authenticate(
   request: Request,
+  options: { readOnly?: boolean } = {},
 ): Promise<AgentPrincipal> {
   const bearer = request.headers
     .get("authorization")
@@ -38,7 +39,7 @@ export async function authenticate(
   if (!bearer)
     throw new AgentError(
       401,
-      "Supply Authorization: Bearer <key>. Get a canvas key from Connect agent in the editor, or a workspace key at /connect.",
+      "Supply your original canvas or workspace key to recover an existing online canvas.",
     )
   const kind = keyKind(bearer)
   if (!kind) throw new AgentError(401, "Invalid key format")
@@ -47,7 +48,7 @@ export async function authenticate(
       await db()`SELECT id, workspace_id FROM agent_documents WHERE canvas_hash = ${hash(bearer)}`
     if (!rows.length)
       throw new AgentError(401, "Invalid or revoked canvas key")
-    await rateLimit(`canvas:${rows[0].id}`, 600)
+    if (!options.readOnly) await rateLimit(`canvas:${rows[0].id}`, 600)
     return {
       workspaceId: rows[0].workspace_id as string,
       documentId: rows[0].id as string,
@@ -57,7 +58,7 @@ export async function authenticate(
     await db()`SELECT id FROM agent_workspaces WHERE key_hash = ${hash(bearer)}`
   if (!rows.length)
     throw new AgentError(401, "Invalid or revoked workspace key")
-  await rateLimit(`workspace:${rows[0].id}`, 240)
+  if (!options.readOnly) await rateLimit(`workspace:${rows[0].id}`, 240)
   return { workspaceId: rows[0].id as string }
 }
 export async function rateLimit(key: string, limit: number, seconds = 60) {
@@ -84,12 +85,19 @@ export async function save(
   revision: number,
   document: CanvasDocument,
 ) {
-  const rows = await db()`WITH changed AS (
-    UPDATE agent_documents SET document = ${JSON.stringify(document)}::jsonb, revision = revision + 1, updated_at = now()
-    WHERE id = ${id} AND workspace_id = ${workspace} AND revision = ${revision} RETURNING *
+  // Lock before comparing: an unchanged save must still reject a stale revision.
+  // jsonb equality also ignores object key order and omitted optional fields.
+  const payload = JSON.stringify(document)
+  const rows = await db()`WITH current AS MATERIALIZED (
+    SELECT * FROM agent_documents
+    WHERE id = ${id} AND workspace_id = ${workspace} AND revision = ${revision} FOR UPDATE
+  ), changed AS (
+    UPDATE agent_documents AS target SET document = ${payload}::jsonb, revision = target.revision + 1, updated_at = now()
+    FROM current WHERE target.id = current.id AND current.document IS DISTINCT FROM ${payload}::jsonb RETURNING target.*
   ), recorded AS (
     INSERT INTO agent_revisions (document_id, revision, document) SELECT id, revision, document FROM changed RETURNING revision
-  ) SELECT changed.* FROM changed JOIN recorded USING (revision)`
+  ) SELECT changed.* FROM changed JOIN recorded USING (revision)
+    UNION ALL SELECT current.* FROM current WHERE current.document = ${payload}::jsonb`
   if (!rows.length)
     throw new AgentError(
       409,

@@ -17,8 +17,8 @@ When the two disagree, the code is right.
   "version": 1,
   "fileName": "sign in",
   "look": { "theme": "internet-blue", "paper": "subtle", "font": "hand", "grid": true },
-  "nodes": { "<id>": { ... } },
-  "order": ["<id>", "<id>"]
+  "nodes": {},
+  "order": []
 }
 ```
 
@@ -29,10 +29,40 @@ When the two disagree, the code is right.
 | `look` | how the whole sheet prints. Every field falls back if it is missing or no longer known. |
 | `nodes` | every layer, keyed by id. The key is the name the rest of the file uses. |
 | `order` | z-order, bottom to top. |
+| `variations` | optional named compositions with member node IDs. |
+| `comments` | optional structured feedback, preserved by browser import/export and local tools. |
 
 `look.theme` is one of `internet-blue`, `riso-red`, `terminal-green`, `plum`,
 `marigold`, `graphite`. `look.paper` is `white`, `subtle` or `shaded`.
 `look.font` is `hand`, `sans` or `serif`. `look.grid` is the canvas dot grid.
+
+## Agent metadata
+
+A local companion keeps optional `variations` and `comments` in this same
+portable file. Browser saves, exports and direct CLI edits preserve them.
+Existing files without these fields remain valid.
+
+```json
+{
+  "variations": [
+    { "id": "meeting-first", "title": "Meeting first", "description": "Lead with the next gathering.", "nodeIds": ["go"] }
+  ],
+  "comments": [
+    { "id": "feedback-1", "text": "Make the date easier to find.", "author": "Pablo", "nodeId": "go", "resolved": false, "createdAt": "2026-09-13T18:00:00.000Z" }
+  ]
+}
+```
+
+A variation has `id`, `title`, `description` and `nodeIds`. A comment has `id`,
+`text`, `author`, `resolved` and an ISO `createdAt`; `nodeId` and `variationId`
+are optional references. Comments are available to agent tools, but do not
+have a canvas comment UI. Use a text note for feedback people must see on the
+canvas.
+
+The companion's revision token and history are not required document fields.
+Local history lives in a sibling `.squig.json.history` directory, capped at
+50 snapshots and 16 MiB per file. Copy the document to transfer its current
+canvas, variations and comments; copy retained history separately if needed.
 
 ## Every node
 
@@ -42,7 +72,7 @@ When the two disagree, the code is right.
 
 | field | type | meaning |
 |---|---|---|
-| `id` | string | letters, digits, `-` and `_`, up to 64. Matches its key in `nodes`. |
+| `id` | string | letters, digits, `-` and `_`, up to 80. Matches its key in `nodes`. |
 | `type` | string | `component`, `shape`, `text`, `arrow`, `draw` or `image`. |
 | `x`, `y` | number | top left in world pixels. y points down. Keep within ±1,000,000. |
 | `w`, `h` | number | the box, in world pixels. |
@@ -65,8 +95,8 @@ values, merged over the def's defaults on the way in.
 { "type": "component", "kind": "button", "props": { "label": "Sign in", "variant": "filled" } }
 ```
 
-`squig components` lists every kind; `squig describe <kind>` gives that one's
-default size, default props, and the controls that say which values are legal.
+`pnpm squig components` lists every kind; `pnpm squig describe <kind>` gives
+that one's default size, default props, and the controls that say which values are legal.
 A `kind` this build does not have is not a document squig can draw.
 
 ### shape
@@ -186,5 +216,5 @@ the button.
 }
 ```
 
-Save that as `anything.squig.json` and `squig validate anything.squig.json`
-will tell you whether squig agrees.
+Save that as `anything.squig.json`. From the checkout, run
+`pnpm squig validate anything.squig.json` to check it.

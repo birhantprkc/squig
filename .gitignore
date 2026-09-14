@@ -50,6 +50,9 @@ next-env.d.ts
 # squig
 .vercel
 *.squig.json
+*.squig.json.lock
+*.squig.json.history/
+*.before-replace-*.bak
 # …except the drawing the empty canvas is generated from
 !scripts/doodle.squig.json
 
